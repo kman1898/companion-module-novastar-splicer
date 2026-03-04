@@ -113,95 +113,64 @@ export const sendUDPRequestsAll = async (instance, requests) => {
 
 /** 生成屏幕的变量 */
 export const formatScreenVariable = (list) => {
-  const screensArr = list.map((item) => ({
-    variableId: `screen_${item.screenId + 1}`,
-    name: `Screen ${item.screenId + 1}`,
-    value: item.name,
-  }));
-  const screensObj = {};
-  screensArr.forEach((variable) => {
-    screensObj[variable.variableId] = variable.value;
+  const screenVariableDefinitions = {};
+  const screenDefaultVariableValues = {};
+  list.forEach((item) => {
+    const variableId = `screen_${item.screenId + 1}`;
+    screenVariableDefinitions[variableId] = { name: `Screen ${item.screenId + 1}` };
+    screenDefaultVariableValues[variableId] = item.name;
   });
-  return {
-    screenVariableDefinitions: screensArr,
-    screenDefaultVariableValues: screensObj,
-  };
+  return { screenVariableDefinitions, screenDefaultVariableValues };
 };
 
 /** 生成图层的变量 */
 export const formatLayerVariable = (screenList) => {
-  const layersArr = [];
-  const layersObj = {};
+  const layerVariableDefinitions = {};
+  const layerDefaultVariableValues = {};
   screenList?.forEach((screen) => {
     (screen.layers || []).forEach((layer) => {
       const variableId = `screen_${screen.screenId + 1}_layer_${layer.layerId + 1}`;
-      layersArr.push({
-        variableId,
-        name: `Screen ${screen.screenId + 1} Layer ${layer.layerId + 1}`,
-        value: layer.name,
-      });
-      layersObj[variableId] = layer.name;
+      layerVariableDefinitions[variableId] = { name: `Screen ${screen.screenId + 1} Layer ${layer.layerId + 1}` };
+      layerDefaultVariableValues[variableId] = layer.name;
     });
   });
-  return {
-    layerVariableDefinitions: layersArr,
-    layerDefaultVariableValues: layersObj,
-  };
+  return { layerVariableDefinitions, layerDefaultVariableValues };
 };
 
 /** 生成场景的变量 */
 export const formatPresetVariable = (screenList) => {
-  const presetsArr = [];
-  const presetsObj = {};
+  const presetVariableDefinitions = {};
+  const presetDefaultVariableValues = {};
   screenList?.forEach((screen) => {
     (screen.presets || []).forEach((preset) => {
       const variableId = `screen_${screen.screenId + 1}_preset_${preset.presetId + 1}`;
-      presetsArr.push({
-        variableId,
-        name: `Screen ${screen.screenId + 1} Preset ${preset.presetId + 1}`,
-        value: preset.name,
-      });
-      presetsObj[variableId] = preset.name;
+      presetVariableDefinitions[variableId] = { name: `Screen ${screen.screenId + 1} Preset ${preset.presetId + 1}` };
+      presetDefaultVariableValues[variableId] = preset.name;
     });
   });
-  return {
-    presetVariableDefinitions: presetsArr,
-    presetDefaultVariableValues: presetsObj,
-  };
+  return { presetVariableDefinitions, presetDefaultVariableValues };
 };
 
 export const formatPresetCollectionVariable = (presetCollectionList) => {
-  const presetCollectionVariables =
-    presetCollectionList?.map(({ name, presetCollectionId }) => ({
-      variableId: `presetCollectionId_${presetCollectionId + 1}`,
-      name: `Preset Group ${presetCollectionId + 1}`,
-      value: name,
-    })) || [];
-  const presetCollectionVariableObj = {};
-  presetCollectionVariables.forEach((variable) => {
-    presetCollectionVariableObj[variable.variableId] = variable.value;
+  const presetCollectionVariableDefinitions = {};
+  const presetCollectionDefaultVariableValues = {};
+  presetCollectionList?.forEach(({ name, presetCollectionId }) => {
+    const variableId = `presetCollectionId_${presetCollectionId + 1}`;
+    presetCollectionVariableDefinitions[variableId] = { name: `Preset Group ${presetCollectionId + 1}` };
+    presetCollectionDefaultVariableValues[variableId] = name;
   });
-  return {
-    presetCollectionVariableDefinitions: presetCollectionVariables,
-    presetCollectionDefaultVariableValues: presetCollectionVariableObj,
-  };
+  return { presetCollectionVariableDefinitions, presetCollectionDefaultVariableValues };
 };
 
 export const formatSourceVariable = (sourceList) => {
-  const sourceVariables =
-    sourceList?.map(({ name, inputId, cropId }) => ({
-      variableId: `source_${inputId + 1}_${cropId}`,
-      name: `Source ${inputId + 1}`,
-      value: name,
-    })) || [];
-  const sourceVariableObj = {};
-  sourceVariables.forEach((variable) => {
-    sourceVariableObj[variable.variableId] = variable.value;
+  const sourceVariableDefinitions = {};
+  const sourceDefaultVariableValues = {};
+  sourceList?.forEach(({ name, inputId, cropId }) => {
+    const variableId = `source_${inputId + 1}_${cropId}`;
+    sourceVariableDefinitions[variableId] = { name: `Source ${inputId + 1}` };
+    sourceDefaultVariableValues[variableId] = name;
   });
-  return {
-    sourceVariableDefinitions: sourceVariables,
-    sourceDefaultVariableValues: sourceVariableObj,
-  };
+  return { sourceVariableDefinitions, sourceDefaultVariableValues };
 };
 
 /**处理输入源 */

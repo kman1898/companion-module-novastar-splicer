@@ -1,4 +1,4 @@
-import { InstanceBase, InstanceStatus, Regex, runEntrypoint, UDPHelper } from '@companion-module/base';
+import { InstanceBase, InstanceStatus, Regex, UDPHelper } from '@companion-module/base';
 
 import { ACTIONS_CMD, PRODUCTS_INFORMATION } from '../utils/constant.js';
 import { upgradeScripts } from './upgrades.js';
@@ -127,13 +127,38 @@ class ModuleInstance extends InstanceBase {
       this.initEnhancedScreen(screenId);
     }
     this.enhancedState.screens[screenId][property] = value;
-    this.checkFeedbacks();
+
+    // Push updated variable value to Companion immediately
+    const prefix = `screen_${screenId + 1}`;
+    const varMap = {
+      brightness: { key: `${prefix}_brightness`, val: value, feedbacks: ['brightness_match'] },
+      frozen: { key: `${prefix}_frozen`, val: value ? 'On' : 'Off', feedbacks: ['frozen_direct', 'screen_frz'] },
+      ftb: { key: `${prefix}_ftb`, val: value ? 'On' : 'Off', feedbacks: ['ftb_direct', 'ftb_selected'] },
+      bkg: { key: `${prefix}_bkg`, val: value ? 'On' : 'Off', feedbacks: ['bkg_direct', 'bkg_switch'] },
+      osdText: { key: `${prefix}_osd_text`, val: value ? 'On' : 'Off', feedbacks: ['osd_text_direct', 'osd_switch'] },
+      osdImage: { key: `${prefix}_osd_image`, val: value ? 'On' : 'Off', feedbacks: ['osd_image_direct', 'osd_switch'] },
+      testPattern: { key: `${prefix}_test_pattern`, val: value ? 'On' : 'Off', feedbacks: ['test_pattern_direct', 'test_pattern_selected'] },
+    };
+    if (varMap[property]) {
+      this.setVariableValues({ [varMap[property].key]: varMap[property].val });
+      this.checkFeedbacks(...varMap[property].feedbacks);
+    }
   }
 
   /** Generate per-screen enhanced variables */
   getEnhancedVariables() {
-    const definitions = [];
+    const definitions = {};
     const values = {};
+
+    // Connection state variable — always available
+    definitions['connection_state'] = { name: 'Connection State' };
+    if (this.connectStatus) {
+      values['connection_state'] = 'Online';
+    } else if (this.config.offlineMode) {
+      values['connection_state'] = 'Offline Programming';
+    } else {
+      values['connection_state'] = 'Disconnected';
+    }
 
     for (const [screenIdStr, state] of Object.entries(this.enhancedState.screens)) {
       const screenId = Number(screenIdStr);
@@ -141,15 +166,13 @@ class ModuleInstance extends InstanceBase {
       const screenName = screen ? screen.name : `Screen ${screenId + 1}`;
       const prefix = `screen_${screenId + 1}`;
 
-      definitions.push(
-        { variableId: `${prefix}_brightness`, name: `${screenName} Brightness` },
-        { variableId: `${prefix}_frozen`, name: `${screenName} Frozen` },
-        { variableId: `${prefix}_ftb`, name: `${screenName} FTB` },
-        { variableId: `${prefix}_bkg`, name: `${screenName} BKG` },
-        { variableId: `${prefix}_osd_text`, name: `${screenName} OSD Text` },
-        { variableId: `${prefix}_osd_image`, name: `${screenName} OSD Image` },
-        { variableId: `${prefix}_test_pattern`, name: `${screenName} Test Pattern` },
-      );
+      definitions[`${prefix}_brightness`] = { name: `${screenName} Brightness` };
+      definitions[`${prefix}_frozen`] = { name: `${screenName} Frozen` };
+      definitions[`${prefix}_ftb`] = { name: `${screenName} FTB` };
+      definitions[`${prefix}_bkg`] = { name: `${screenName} BKG` };
+      definitions[`${prefix}_osd_text`] = { name: `${screenName} OSD Text` };
+      definitions[`${prefix}_osd_image`] = { name: `${screenName} OSD Image` };
+      definitions[`${prefix}_test_pattern`] = { name: `${screenName} Test Pattern` };
 
       values[`${prefix}_brightness`] = state.brightness;
       values[`${prefix}_frozen`] = state.frozen ? 'On' : 'Off';
@@ -259,14 +282,21 @@ class ModuleInstance extends InstanceBase {
     this.generateOfflineData();
     this.updateAll();
 
+    // Offline Programming Mode — set OK immediately so variables and feedbacks work
+    if (this.config.offlineMode) {
+      this.log('info', 'Offline Programming Mode enabled');
+      this.updateStatus(InstanceStatus.Ok, 'Offline Programming Mode');
+    }
+
     // If host is configured, attempt connection
     if (this.config.host) {
-      this.updateStatus(InstanceStatus.Connecting);
+      if (!this.config.offlineMode) {
+        this.updateStatus(InstanceStatus.Connecting);
+      }
       this.initUDP();
-    } else {
-      // No host = offline mode, status Ok for programming
-      this.log('info', 'No host configured — running in offline mode for programming');
-      this.updateStatus(InstanceStatus.Ok, 'Offline');
+    } else if (!this.config.offlineMode) {
+      this.log('info', 'No host configured');
+      this.updateStatus(InstanceStatus.Disconnected, 'No host configured');
     }
   }
 
@@ -274,7 +304,8 @@ class ModuleInstance extends InstanceBase {
   updateAll() {
     this.setActionDefinitions(getActions(this));
     this.setFeedbackDefinitions(getFeedbacks(this));
-    this.setPresetDefinitions(getPresetDefinitions(this));
+    const { structure, presets } = getPresetDefinitions(this);
+    this.setPresetDefinitions(structure, presets);
     // 处理变量
     const { screenVariableDefinitions, screenDefaultVariableValues } = formatScreenVariable(this.screenList);
     const { layerVariableDefinitions, layerDefaultVariableValues } = formatLayerVariable(this.screenList);
@@ -286,14 +317,14 @@ class ModuleInstance extends InstanceBase {
     // ENHANCED: Get per-screen enhanced variables
     const { definitions: enhancedDefs, values: enhancedVals } = this.getEnhancedVariables();
 
-    this.setVariableDefinitions([
+    this.setVariableDefinitions({
       ...screenVariableDefinitions,
       ...layerVariableDefinitions,
       ...presetVariableDefinitions,
       ...presetCollectionVariableDefinitions,
       ...sourceVariableDefinitions,
       ...enhancedDefs,
-    ]);
+    });
     this.setVariableValues({
       ...screenDefaultVariableValues,
       ...layerDefaultVariableValues,
@@ -365,9 +396,24 @@ class ModuleInstance extends InstanceBase {
       // Device size configuration (always available for offline programming)
       {
         type: 'static-text',
+        id: 'offline_heading',
+        width: 12,
+        label: 'Offline Programming',
+        value: 'Enable Offline Programming Mode to activate variables and feedbacks without a device connection. This allows full pre-programming of your show before equipment arrives on-site.',
+      },
+      {
+        type: 'checkbox',
+        id: 'offlineMode',
+        label: 'Enable Offline Programming Mode',
+        width: 6,
+        default: false,
+        tooltip: 'When enabled, the module will report as connected (OK) even without a device, allowing variables and feedbacks to function for offline programming.',
+      },
+      {
+        type: 'static-text',
         id: 'offline_info',
         width: 12,
-        label: 'Information',
+        label: 'Device Configuration',
         value: 'The counts below will automatically populate from the device upon connection, however, they can be set manually for offline programming.',
       },
       {
@@ -469,7 +515,12 @@ class ModuleInstance extends InstanceBase {
       this.udp = new UDPHelper(this.config.host, this.config.port);
 
       this.udp.on('error', (err) => {
-        this.updateStatus(InstanceStatus.ConnectionFailure);
+        this.log('warn', `UDP error: ${err.message}`);
+        this.connectStatus = false;
+        if (!this.config.offlineMode) {
+          this.updateStatus(InstanceStatus.ConnectionFailure);
+        }
+        this.updateAll();
       });
 
       this.udp.on('listening', () => {
@@ -507,6 +558,7 @@ class ModuleInstance extends InstanceBase {
     const hasHost = !!config.host;
     const hostChanged = this.config.host !== config.host;
     const sizeChanged = this.config.screenCount !== config.screenCount || this.config.inputCardCount !== config.inputCardCount;
+    const offlineModeChanged = this.config.offlineMode !== config.offlineMode;
 
     this.log('info', 'configUpdated module....');
 
@@ -520,6 +572,21 @@ class ModuleInstance extends InstanceBase {
       this.enhancedState = { screens: {} };
       this.generateOfflineData();
       this.updateAll();
+    }
+
+    // If offline mode toggled, update status immediately
+    if (offlineModeChanged) {
+      if (this.config.offlineMode) {
+        this.updateStatus(InstanceStatus.Ok, 'Offline Programming Mode');
+        this.updateAll();
+      } else if (!this.connectStatus) {
+        // Turning off offline mode while not connected
+        if (hasHost) {
+          this.updateStatus(InstanceStatus.Connecting);
+        } else {
+          this.updateStatus(InstanceStatus.Disconnected, 'No host configured');
+        }
+      }
     }
 
     // No host = stay in offline mode
@@ -536,7 +603,11 @@ class ModuleInstance extends InstanceBase {
       this.heartbeatManager.stop();
       this.clearInitStatusTimer();
       this.connectStatus = false;
-      this.updateStatus(InstanceStatus.Ok, 'Offline');
+      if (this.config.offlineMode) {
+        this.updateStatus(InstanceStatus.Ok, 'Offline Programming Mode');
+      } else {
+        this.updateStatus(InstanceStatus.Disconnected, 'No host configured');
+      }
       return;
     }
 
@@ -676,8 +747,13 @@ class ModuleInstance extends InstanceBase {
 
   handleHeartbeatTimeout() {
     this.connectStatus = false;
-    this.updateStatus(InstanceStatus.ConnectionFailure);
-    this.log('debug', 'Heartbeat timeout, device disconnected');
+    if (this.config.offlineMode) {
+      this.updateStatus(InstanceStatus.Ok, 'Offline Programming Mode');
+    } else {
+      this.updateStatus(InstanceStatus.ConnectionFailure);
+    }
+    this.log('warn', 'Heartbeat timeout — device disconnected');
+    this.updateAll();
     // 保持心跳请求
   }
 
@@ -687,4 +763,5 @@ class ModuleInstance extends InstanceBase {
   }
 }
 
-runEntrypoint(ModuleInstance, upgradeScripts);
+export default ModuleInstance;
+export { upgradeScripts };

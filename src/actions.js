@@ -46,7 +46,7 @@ export const getActions = (instance) => {
         if (enable === 0) {
           instance.selectedScreenList = instance.selectedScreenList.filter((item) => item !== screenId);
         }
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("screen_selected");
       },
     },
     // 选择图层
@@ -91,7 +91,7 @@ export const getActions = (instance) => {
         if (enable === 0) {
           instance.selectedLayerInfo = null;
         }
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("layer_selected");
       },
     },
     // 加载场景
@@ -113,7 +113,7 @@ export const getActions = (instance) => {
         instance.log('debug', JSON.stringify(event.options));
         const [screenId, presetId] = combineId.split('_').map((item) => Number(item));
         instance.selectedPresetInfo = { screenId, presetId };
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("preset_loaded");
         if (!instance.connectStatus) return;
         const command = handleParams(ACTIONS_CMD.load_preset, {
           screenId,
@@ -133,7 +133,7 @@ export const getActions = (instance) => {
           label: 'Command',
           id: 'command',
           default: DEFAULT_COMMAND,
-          required: true,
+          requiredExpression: true,
         },
       ],
       callback: (event) => {
@@ -166,7 +166,7 @@ export const getActions = (instance) => {
       callback: async (action) => {
         const { presetCollectionId } = action.options;
         instance.selectedPresetCollectionId = presetCollectionId;
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("preset_group_selected");
         if (!instance.connectStatus) return;
         applyPresetCollection(instance, { presetCollectionId });
       },
@@ -200,7 +200,7 @@ export const getActions = (instance) => {
           pvwActive: !isPgm,
           takeActive: false,
         };
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("pgm_pvw_switch");
         if (!instance.connectStatus) return;
         instance.selectedScreenList?.forEach((_screenId) => {
           applyPgmOrPvw(instance, {
@@ -237,7 +237,7 @@ export const getActions = (instance) => {
         if (!instance.pgmOrPvwActive.pvwActive) return;
         const { manualPlay } = action.options;
         instance.pgmOrPvwActive.takeActive = manualPlay === 1;
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("pvw_take_selected");
         if (!instance.connectStatus) return;
         instance.selectedScreenList?.forEach((_screenId) => {
           applyPgmOrPvw(instance, {
@@ -277,7 +277,7 @@ export const getActions = (instance) => {
         instance.selectedScreenList?.forEach((screenId) => {
           instance.updateEnhancedFromAction(screenId, 'ftb', !type);
         });
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("ftb_selected", "ftb_direct");
         if (!instance.connectStatus) return;
         if (!instance.selectedScreenList?.length) return;
         const param = instance.selectedScreenList.map((screenId) => ({ type, screenId }));
@@ -309,7 +309,7 @@ export const getActions = (instance) => {
       callback: async (action) => {
         const { isMute } = action.options;
         instance.volumeMute = !isMute;
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("volume_switch_selected");
         if (!instance.connectStatus) return;
         if (!instance.selectedScreenList?.length) return;
         const resList = [];
@@ -339,13 +339,13 @@ export const getActions = (instance) => {
     },
     /** 屏幕冻结 */
     screen_frz_toggle: {
-      name: 'Screen FRZ',
+      name: 'Freeze',
       description: 'On/Off; freeze the selected screen.',
       options: [
         {
           type: 'dropdown',
-          name: 'Screen FRZ',
-          label: 'Screen FRZ',
+          name: 'Freeze',
+          label: 'Freeze',
           id: 'enable',
           default: 1,
           choices: [
@@ -368,7 +368,7 @@ export const getActions = (instance) => {
         instance.selectedScreenList?.forEach((screenId) => {
           instance.updateEnhancedFromAction(screenId, 'frozen', enable === 1);
         });
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("screen_frz", "frozen_direct");
         if (!instance.connectStatus) return;
         if (instance.selectedScreenList.length === 0) {
           instance.log('error', 'Please select a screen');
@@ -462,6 +462,74 @@ export const getActions = (instance) => {
         });
       },
     },
+    // Set absolute brightness (W0410) with variable support
+    set_brightness: {
+      name: 'Set Brightness',
+      description: 'Set the brightness of the selected screen to an absolute value (0-100). Supports variables.',
+      options: [
+        {
+          type: 'dropdown',
+          name: 'Screen',
+          label: 'Screen',
+          id: 'screenId',
+          default: screenListDropDown[0]?.id ?? null,
+          choices: screenListDropDown,
+        },
+        {
+          type: 'textinput',
+          name: 'Brightness (0-100)',
+          label: 'Brightness (0-100)',
+          id: 'brightness',
+          default: '100',
+          useVariables: true,
+        },
+      ],
+      callback: async (event) => {
+        const screenId = event.options.screenId;
+        const brightnessRaw = String(event.options.brightness);
+        const brightness = Math.max(0, Math.min(100, Math.round(Number(brightnessRaw))));
+        if (isNaN(brightness)) {
+          instance.log('warn', `set_brightness: invalid brightness value "${event.options.brightness}"`);
+          return;
+        }
+        // Update local state
+        const curScreenDetails = instance.screenList?.find((screen) => screen.screenId === screenId)?.details;
+        if (curScreenDetails) {
+          curScreenDetails.brightness = brightness;
+        }
+        // ENHANCED: Optimistic update for per-screen brightness
+        instance.updateEnhancedFromAction(screenId, 'brightness', brightness);
+        if (!instance.connectStatus) return;
+        const command = handleParams(ACTIONS_CMD.apply_screen_brightness, {
+          screenId,
+          brightness,
+        });
+        instance.udp.send(command);
+      },
+    },
+    // Save current brightness to LED receiving card hardware (W0417)
+    save_brightness: {
+      name: 'Save Brightness',
+      description: 'Save the current screen brightness to the LED receiving card hardware. No brightness parameter needed.',
+      options: [
+        {
+          type: 'dropdown',
+          name: 'Screen',
+          label: 'Screen',
+          id: 'screenId',
+          default: screenListDropDown[0]?.id ?? null,
+          choices: screenListDropDown,
+        },
+      ],
+      callback: (event) => {
+        const screenId = event.options.screenId;
+        if (!instance.connectStatus) return;
+        const command = handleParams(ACTIONS_CMD.save_screen_brightness, {
+          screenId,
+        });
+        instance.udp.send(command);
+      },
+    },
     /** 图层冻结 */
     layer_frz_toggle: {
       name: 'Layer FRZ',
@@ -489,7 +557,7 @@ export const getActions = (instance) => {
         const { enable } = action.options;
         instance.log('debug', action.options);
         instance.layerFRZState = enable;
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("layer_frz");
         if (!instance.connectStatus) return;
         if (!instance.selectedLayerInfo) {
           instance.log('error', 'Please select a layer');
@@ -522,7 +590,7 @@ export const getActions = (instance) => {
         const { id } = action.options;
         const source = instance.sourceList?.find((_item) => id === `${_item.inputId}_${_item.cropId}`);
         instance.selectedSourceId = id;
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("source_switch_selected");
         if (!instance.connectStatus) return;
         if (!source || !instance.selectedLayerInfo) return;
         instance.udp.send(
@@ -569,7 +637,7 @@ export const getActions = (instance) => {
         instance.selectedScreenList?.forEach((screenId) => {
           instance.updateEnhancedFromAction(screenId, 'testPattern', testPattern === TEST_PATTERN_TYPE.OPEN);
         });
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("test_pattern_selected", "test_pattern_direct");
         if (!instance.connectStatus) return;
         //目前的协议只支持遍历通过接口修改测试画面，后续协议支持按照屏幕修改后调整
         for (const screenId of instance.selectedScreenList) {
@@ -643,7 +711,7 @@ export const getActions = (instance) => {
         instance.selectedScreenList?.forEach((screenId) => {
           instance.updateEnhancedFromAction(screenId, 'bkg', !!enable);
         });
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("bkg_switch", "bkg_direct");
         if (!instance.connectStatus) return;
         if (!instance.selectedScreenList?.length) return;
         const requests = [];
@@ -720,7 +788,7 @@ export const getActions = (instance) => {
         instance.selectedScreenList?.forEach((screenId) => {
           instance.updateEnhancedFromAction(screenId, prop, !!enable);
         });
-        instance.checkFeedbacks();
+        instance.checkFeedbacks("osd_switch", "osd_text_direct", "osd_image_direct");
         if (!instance.connectStatus) return;
         if (!instance.selectedScreenList?.length) return;
         const requests = [];
@@ -744,6 +812,32 @@ export const getActions = (instance) => {
           );
         });
         sendUDPRequestsSync(instance, requests);
+      },
+    },
+    // Global blackout on all screens (W0700)
+    blackout: {
+      name: 'Blackout',
+      description: 'Enable or disable blackout on all screens.',
+      options: [
+        {
+          type: 'dropdown',
+          name: 'State',
+          label: 'State',
+          id: 'state',
+          default: 1,
+          choices: [
+            { id: 1, label: 'Enable' },
+            { id: 0, label: 'Disable' },
+          ],
+        },
+      ],
+      callback: (event) => {
+        const state = parseInt(event.options.state);
+        if (!instance.connectStatus) return;
+        const command = handleParams(ACTIONS_CMD.blackout, {
+          blackout: state,
+        });
+        instance.udp.send(command);
       },
     },
   };

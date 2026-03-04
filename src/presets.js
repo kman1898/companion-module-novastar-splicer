@@ -1,20 +1,20 @@
 import { combineRgb } from '@companion-module/base';
 import { MODULE_NAME, PGM_PVW_TYPE, TEST_PATTERN_TYPE } from '../utils/constant.js';
 
-/** 屏幕、图层、场景预设 */
-const getSLPPresets = (screenList) => {
-  /** 选中屏幕 */
-  const screenPresets = {};
-  /** 选中图层 */
-  const layerPresets = {};
-  /** 加载场景 */
-  const presetPresets = {};
-  screenList?.forEach((screen) => {
+// ============================================================================
+// Screen-first preset layout with template groups
+// ============================================================================
+
+/** Build all preset definitions (flat map, keyed by unique ID) */
+const buildAllPresets = (instance) => {
+  const presets = {};
+
+  // ---- Screen Selection presets (one per screen, stays simple) ----
+  instance.screenList?.forEach((screen) => {
     const { name, screenId } = screen;
-    const selectScreenPreset = {
-      type: 'button',
-      category: 'Screen',
-      name: name,
+    presets[`screen_${screenId}`] = {
+      type: 'simple',
+      name,
       style: {
         text: `$(${MODULE_NAME}:screen_${screenId + 1})`,
         size: 'auto',
@@ -24,508 +24,216 @@ const getSLPPresets = (screenList) => {
       feedbacks: [
         {
           feedbackId: 'screen_selected',
-          options: { screenId: screenId },
-          style: {
-            bgcolor: combineRgb(0, 255, 0), // 选中时高亮绿色
-            color: combineRgb(0, 0, 0), // 选中时字体黑色
+          options: { screenId },
+          style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) },
+        },
+      ],
+      steps: [
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }], up: [] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 0 } }], up: [] },
+      ],
+    };
+  });
+
+  // ---- Template: Preset Recall (one template per screen) ----
+  instance.screenList?.forEach((screen) => {
+    const { screenId } = screen;
+    presets[`tpl_preset_recall_${screenId}`] = {
+      type: 'simple',
+      name: 'Preset Recall',
+      localVariables: [
+        { variableName: 'presetIndex', variableType: 'simple', startupValue: 0 },
+      ],
+      style: {
+        text: `$(${MODULE_NAME}:screen_${screenId + 1})\nPreset $(local:presetIndex)`,
+        size: 'auto',
+        color: combineRgb(255, 255, 255),
+        bgcolor: combineRgb(0, 0, 0),
+      },
+      feedbacks: [
+        {
+          feedbackId: 'preset_loaded',
+          options: {
+            combineId: { value: `concat('${screenId}_', $(local:presetIndex))`, isExpression: true },
           },
+          style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) },
+        },
+      ],
+      steps: [
+        {
+          down: [{
+            actionId: 'load_preset',
+            options: {
+              combineId: { value: `concat('${screenId}_', $(local:presetIndex))`, isExpression: true },
+              screenId,
+            },
+          }],
+          up: [],
+        },
+      ],
+    };
+  });
+
+  // ---- Template: Layer Selection (one template per screen) ----
+  instance.screenList?.forEach((screen) => {
+    const { screenId } = screen;
+    presets[`tpl_layer_select_${screenId}`] = {
+      type: 'simple',
+      name: 'Layer Select',
+      localVariables: [
+        { variableName: 'layerIndex', variableType: 'simple', startupValue: 0 },
+      ],
+      style: {
+        text: `$(${MODULE_NAME}:screen_${screenId + 1})\nLayer $(local:layerIndex)`,
+        size: 'auto',
+        color: combineRgb(255, 255, 255),
+        bgcolor: combineRgb(0, 0, 0),
+      },
+      feedbacks: [
+        {
+          feedbackId: 'layer_selected',
+          options: {
+            combineId: { value: `concat('${screenId}_', $(local:layerIndex))`, isExpression: true },
+          },
+          style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) },
+        },
+      ],
+      steps: [
+        {
+          down: [{
+            actionId: 'select_layer',
+            options: {
+              combineId: { value: `concat('${screenId}_', $(local:layerIndex))`, isExpression: true },
+              screenId,
+              enable: 1,
+            },
+          }],
+          up: [],
+        },
+        {
+          down: [{
+            actionId: 'select_layer',
+            options: {
+              combineId: { value: `concat('${screenId}_', $(local:layerIndex))`, isExpression: true },
+              screenId,
+              enable: 0,
+            },
+          }],
+          up: [],
+        },
+      ],
+    };
+  });
+
+  // ---- Template: Brightness Level (one template per screen) ----
+  instance.screenList?.forEach((screen) => {
+    const { screenId } = screen;
+    presets[`tpl_brightness_${screenId}`] = {
+      type: 'simple',
+      name: 'Brightness Level',
+      localVariables: [
+        { variableName: 'brightnessLevel', variableType: 'simple', startupValue: 100 },
+      ],
+      style: {
+        text: `$(${MODULE_NAME}:screen_${screenId + 1})\n$(local:brightnessLevel)%`,
+        size: 'auto',
+        color: combineRgb(255, 255, 255),
+        bgcolor: combineRgb(0, 0, 0),
+      },
+      feedbacks: [
+        {
+          feedbackId: 'brightness_match',
+          options: {
+            screenId,
+            brightness: { value: '$(local:brightnessLevel)', isExpression: true },
+          },
+          style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) },
         },
       ],
       steps: [
         {
           down: [
             {
-              actionId: 'select_screen',
+              actionId: 'set_brightness',
               options: {
-                screenId: screenId,
-                enable: 1,
+                screenId,
+                brightness: { value: '$(local:brightnessLevel)', isExpression: true },
               },
             },
-          ],
-        },
-        {
-          down: [
             {
-              actionId: 'select_screen',
-              options: {
-                screenId: screenId,
-                enable: 0,
-              },
+              actionId: 'save_brightness',
+              options: { screenId },
+              delay: 100,
             },
           ],
+          up: [],
         },
       ],
     };
-    screenPresets[`screen ${screenId}`] = selectScreenPreset;
-
-    screen.layers?.forEach((layer) => {
-      const { name: layerName, layerId } = layer;
-      const selectLayerPreset = {
-        type: 'button',
-        category: 'Layer',
-        name: layerName,
-        style: {
-          text: `$(${MODULE_NAME}:screen_${screenId + 1})\n$(${MODULE_NAME}:screen_${screenId + 1}_layer_${layerId + 1})`,
-          size: 'auto',
-          color: combineRgb(255, 255, 255),
-          bgcolor: combineRgb(0, 0, 0),
-        },
-        feedbacks: [
-          {
-            feedbackId: 'layer_selected',
-            options: { combineId: `${screenId}_${layerId}` },
-            style: {
-              bgcolor: combineRgb(0, 255, 0), // 选中时高亮绿色
-              color: combineRgb(0, 0, 0), // 选中时字体黑色
-            },
-          },
-        ],
-        steps: [
-          {
-            down: [
-              {
-                actionId: 'select_layer',
-                options: {
-                  combineId: `${screenId}_${layerId}`,
-                  screenId: screenId,
-                  enable: 1,
-                },
-              },
-            ],
-          },
-          {
-            down: [
-              {
-                actionId: 'select_layer',
-                options: {
-                  combineId: `${screenId}_${layerId}`,
-                  screenId: screenId,
-                  enable: 0,
-                },
-              },
-            ],
-          },
-        ],
-      };
-      layerPresets[`layer_${screenId}_${layerId}`] = selectLayerPreset;
-    });
-    screen.presets?.forEach((preset) => {
-      const { name: presetName, presetId } = preset;
-      const selectPresetPreset = {
-        type: 'button',
-        category: `Presets: ${name}`,
-        name: presetName,
-        style: {
-          text: `$(${MODULE_NAME}:screen_${screenId + 1})\n$(${MODULE_NAME}:screen_${screenId + 1}_preset_${presetId + 1})`,
-          size: 'auto',
-          color: combineRgb(255, 255, 255),
-          bgcolor: combineRgb(0, 0, 0),
-        },
-        feedbacks: [
-          {
-            feedbackId: 'preset_loaded',
-            options: { combineId: `${screenId}_${presetId}` },
-            style: {
-              bgcolor: combineRgb(0, 255, 0),
-              color: combineRgb(0, 0, 0),
-            },
-          },
-        ],
-        steps: [
-          {
-            down: [
-              {
-                actionId: 'load_preset',
-                options: {
-                  combineId: `${screenId}_${presetId}`,
-                  screenId: screenId,
-                },
-              },
-            ],
-          },
-        ],
-      };
-      presetPresets[`preset_${screenId}_${presetId}`] = selectPresetPreset;
-    });
   });
 
-  return {
-    screenPresets,
-    layerPresets,
-    presetPresets,
-  };
-};
+  // ---- Per-screen Brightness +/- (stays simple, not templatable) ----
+  instance.screenList?.forEach((screen) => {
+    const { name, screenId } = screen;
 
-/** 组合场景 */
-const getPresetCollectionsPresets = (instance) => {
-  const presetCollections = {};
+    presets[`direct_bright_up_${screenId}`] = {
+      type: 'simple',
+      name: `${name} Brightness +`,
+      style: { text: `${name}\nBright +`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+      steps: [
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'screen_brightness_add', options: {} }], up: [] },
+      ],
+      feedbacks: [],
+    };
+
+    presets[`direct_bright_down_${screenId}`] = {
+      type: 'simple',
+      name: `${name} Brightness -`,
+      style: { text: `${name}\nBright -`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+      steps: [
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'screen_brightness_minus', options: {} }], up: [] },
+      ],
+      feedbacks: [],
+    };
+  });
+
+  // ---- Preset Collection (Group) presets ----
   instance.presetCollectionList?.forEach(({ name, presetCollectionId }) => {
-    const presetCollection = {
-      type: 'button',
-      category: 'Preset Group',
-      name: name,
+    presets[`preset_group_${presetCollectionId}`] = {
+      type: 'simple',
+      name,
       style: {
-        text: `$({MODULE_NAME}:presetCollectionId_${presetCollectionId + 1})`,
+        text: `$(${MODULE_NAME}:presetCollectionId_${presetCollectionId + 1})`,
         size: 'auto',
         color: combineRgb(255, 255, 255),
         bgcolor: combineRgb(0, 0, 0),
       },
       steps: [
-        {
-          down: [
-            {
-              actionId: 'play_preset_collection',
-              options: {
-                presetCollectionId,
-              },
-            },
-          ],
-        },
+        { down: [{ actionId: 'play_preset_collection', options: { presetCollectionId } }], up: [] },
       ],
       feedbacks: [
         {
           feedbackId: 'preset_group_selected',
           options: { presetCollectionId },
-          style: {
-            bgcolor: combineRgb(0, 255, 0),
-            color: combineRgb(0, 0, 0),
-          },
+          style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) },
         },
       ],
     };
-    presetCollections[`preset_group ${presetCollectionId}`] = presetCollection;
   });
-  return presetCollections;
-};
 
-/** 屏幕应用*/
-const applyScreenPreset = () => {
-  // 实时模式 PGM
-  const pgmOrPvwSwitch = {
-    type: 'button',
-    category: 'Display',
-    name: 'PGM/PVW',
-    style: {
-      text: 'PGM/PVW',
-      size: 'auto',
-      color: combineRgb(255, 255, 255),
-      bgcolor: combineRgb(0, 0, 0),
-    },
-    steps: [
-      {
-        down: [
-          {
-            actionId: 'pgm_pvw_switch',
-            options: {
-              enNonTime: 0,
-            },
-          },
-        ],
-      },
-      {
-        down: [
-          {
-            actionId: 'pgm_pvw_switch',
-            options: {
-              enNonTime: 1,
-            },
-          },
-        ],
-      },
-    ],
-    feedbacks: [
-      {
-        feedbackId: 'pgm_pvw_switch',
-        options: { type: PGM_PVW_TYPE.PGM },
-        style: {
-          bgcolor: combineRgb(0, 255, 0),
-          color: combineRgb(0, 0, 0),
-          text: 'PGM',
-        },
-      },
-      {
-        feedbackId: 'pgm_pvw_switch',
-        options: { type: PGM_PVW_TYPE.PVW },
-        style: {
-          bgcolor: combineRgb(255, 0, 0),
-          color: combineRgb(0, 0, 0),
-          text: 'PVW',
-        },
-      },
-    ],
-  };
-  const takeApply = {
-    type: 'button',
-    category: 'Display',
-    name: 'Take',
-    style: {
-      text: 'Take',
-      size: 'auto',
-      color: combineRgb(255, 255, 255),
-      bgcolor: combineRgb(0, 0, 0),
-    },
-    steps: [
-      {
-        down: [
-          {
-            actionId: 'take_switch',
-            options: {
-              manualPlay: 1,
-            },
-          },
-        ],
-      },
-      {
-        down: [
-          {
-            actionId: 'take_switch',
-            options: {
-              manualPlay: 0,
-            },
-          },
-        ],
-      },
-    ],
-    feedbacks: [
-      {
-        feedbackId: 'pvw_take_selected',
-        style: {
-          bgcolor: combineRgb(0, 255, 0),
-          color: combineRgb(0, 0, 0),
-        },
-      },
-    ],
-  };
-  const blackScreen = {
-    type: 'button',
-    category: 'Display',
-    name: 'FTB',
-    style: {
-      text: 'FTB',
-      size: 'auto',
-      color: combineRgb(255, 255, 255),
-      bgcolor: combineRgb(0, 0, 0),
-    },
-    steps: [
-      {
-        down: [
-          {
-            actionId: 'apply_ftb',
-            options: {
-              type: 0,
-            },
-          },
-        ],
-      },
-      {
-        down: [
-          {
-            actionId: 'apply_ftb',
-            options: {
-              type: 1,
-            },
-          },
-        ],
-      },
-    ],
-    feedbacks: [
-      {
-        feedbackId: 'ftb_selected',
-        style: {
-          bgcolor: combineRgb(255, 0, 0),
-          color: combineRgb(0, 0, 0),
-        },
-      },
-    ],
-  };
-  const volumeSwitch = {
-    type: 'button',
-    category: 'Display',
-    name: 'Volume Switch',
-    style: {
-      text: 'Volume Switch',
-      size: 'auto',
-      color: combineRgb(255, 255, 255),
-      bgcolor: combineRgb(0, 0, 0),
-    },
-    steps: [
-      {
-        down: [{ actionId: 'apply_volume_switch', options: { isMute: 0 } }],
-      },
-      {
-        down: [{ actionId: 'apply_volume_switch', options: { isMute: 1 } }],
-      },
-    ],
-    feedbacks: [
-      {
-        feedbackId: 'volume_switch_selected',
-        style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) },
-      },
-    ],
-  };
-  const freezeScreen = {
-    type: 'button',
-    category: 'Display',
-    name: 'Screen FRZ',
-    style: {
-      text: 'Screen\nFRZ',
-      size: 'auto',
-      color: combineRgb(255, 255, 255),
-      bgcolor: combineRgb(0, 0, 0),
-    },
-    feedbacks: [
-      {
-        feedbackId: 'screen_frz',
-        style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0) },
-      },
-    ],
-    steps: [
-      { down: [{ actionId: 'screen_frz_toggle', options: { enable: 1 } }] },
-      { down: [{ actionId: 'screen_frz_toggle', options: { enable: 0 } }] },
-    ],
-  };
-  const volumeAdd = {
-    type: 'button',
-    category: 'Display',
-    name: 'Volume Add',
-    style: { text: 'Volume\n+', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-    steps: [{ down: [{ actionId: 'screen_volume_add', options: {} }] }],
-    feedbacks: [],
-  };
-  const volumeMinus = {
-    name: 'Volume Minus',
-    type: 'button',
-    category: 'Display',
-    style: { text: 'Volume\n-', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-    steps: [{ down: [{ actionId: 'screen_volume_minus', options: {} }] }],
-    feedbacks: [],
-  };
-  const brightnessAdd = {
-    type: 'button',
-    category: 'Display',
-    name: 'Brightness Add',
-    style: { text: 'Brightness\n+', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-    steps: [{ down: [{ actionId: 'screen_brightness_add', options: {} }] }],
-    feedbacks: [],
-  };
-  const brightnessMinus = {
-    name: 'Brightness Minus',
-    type: 'button',
-    category: 'Display',
-    style: { text: 'Brightness\n-', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-    steps: [{ down: [{ actionId: 'screen_brightness_minus', options: {} }] }],
-    feedbacks: [],
-  };
-  const freezeLayer = {
-    type: 'button',
-    category: 'Display',
-    name: 'Layer FRZ',
-    style: { text: 'Layer\nFRZ', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-    feedbacks: [
-      { feedbackId: 'layer_frz', style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0) } },
-    ],
-    steps: [
-      { down: [{ actionId: 'layer_frz_toggle', options: { enable: 1 } }] },
-      { down: [{ actionId: 'layer_frz_toggle', options: { enable: 0 } }] },
-    ],
-  };
-  const testPattern = {
-    type: 'button',
-    category: 'Display',
-    name: 'Test Pattern',
-    style: { text: 'Test\nPattern', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-    steps: [
-      { down: [{ actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.OPEN } }] },
-      { down: [{ actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.CLOSE } }] },
-    ],
-    feedbacks: [
-      { feedbackId: 'test_pattern_selected', style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
-    ],
-  };
-  const bkgSwitch = {
-    type: 'button',
-    category: 'Display',
-    name: 'BKG',
-    style: { text: 'BKG', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-    steps: [
-      { down: [{ actionId: 'bkg_switch', options: { enable: 1 } }] },
-      { down: [{ actionId: 'bkg_switch', options: { enable: 0 } }] },
-    ],
-    feedbacks: [
-      { feedbackId: 'bkg_switch', style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
-    ],
-  };
-  const osdTextSwitch = {
-    type: 'button',
-    category: 'Display',
-    name: 'OSD Text',
-    style: { text: 'OSD\nText', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-    steps: [
-      { down: [{ actionId: 'osd_switch', options: { enable: 1, osdType: 'text' } }] },
-      { down: [{ actionId: 'osd_switch', options: { enable: 0, osdType: 'text' } }] },
-    ],
-    feedbacks: [
-      {
-        feedbackId: 'osd_switch',
-        options: { osdType: 'text' },
-        style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) },
-      },
-    ],
-  };
-  const osdImageSwitch = {
-    type: 'button',
-    category: 'Display',
-    name: 'OSD Image',
-    style: { text: 'OSD\nImage', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-    steps: [
-      { down: [{ actionId: 'osd_switch', options: { enable: 1, osdType: 'image' } }] },
-      { down: [{ actionId: 'osd_switch', options: { enable: 0, osdType: 'image' } }] },
-    ],
-    feedbacks: [
-      {
-        feedbackId: 'osd_switch',
-        options: { osdType: 'image' },
-        style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) },
-      },
-    ],
-  };
-
-  return {
-    pgmOrPvwSwitch,
-    take_apply: takeApply,
-    black_screen: blackScreen,
-    volume_switch: volumeSwitch,
-    freezeScreen,
-    freezeLayer,
-    volume_add: volumeAdd,
-    volume_minus: volumeMinus,
-    brightness_add: brightnessAdd,
-    brightness_minus: brightnessMinus,
-    testPattern,
-    bkgSwitch,
-    osdTextSwitch,
-    osdImageSwitch,
-  };
-};
-
-/** 输入源列表 */
-const getSourceListPresets = (instance) => {
-  const sourceList = {};
+  // ---- Source List presets ----
   instance.sourceList?.forEach(({ name, inputId, cropId }) => {
-    const source = {
-      type: 'button',
-      category: 'Source List',
+    presets[`source_${inputId}_${cropId}`] = {
+      type: 'simple',
       name,
       style: {
-        text: `$({MODULE_NAME}:source_${inputId + 1}_${cropId})`,
+        text: `$(${MODULE_NAME}:source_${inputId + 1}_${cropId})`,
         size: '12',
         color: combineRgb(255, 255, 255),
         bgcolor: combineRgb(0, 0, 0),
       },
       steps: [
-        {
-          down: [{ actionId: 'source_switch', options: { id: `${inputId}_${cropId}` } }],
-        },
+        { down: [{ actionId: 'source_switch', options: { id: `${inputId}_${cropId}` } }], up: [] },
       ],
       feedbacks: [
         {
@@ -535,143 +243,287 @@ const getSourceListPresets = (instance) => {
         },
       ],
     };
-    sourceList[`source_${inputId}_${cropId}`] = source;
   });
-  return sourceList;
-};
 
-// ==================== ENHANCED: Per-screen direct control presets ====================
+  // ---- Global Display controls ----
+  presets['pgm_pvw_switch'] = {
+    type: 'simple',
+    name: 'PGM/PVW',
+    style: { text: 'PGM/PVW', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [
+      { down: [{ actionId: 'pgm_pvw_switch', options: { enNonTime: 0 } }], up: [] },
+      { down: [{ actionId: 'pgm_pvw_switch', options: { enNonTime: 1 } }], up: [] },
+    ],
+    feedbacks: [
+      { feedbackId: 'pgm_pvw_switch', options: { type: PGM_PVW_TYPE.PGM }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0), text: 'PGM' } },
+      { feedbackId: 'pgm_pvw_switch', options: { type: PGM_PVW_TYPE.PVW }, style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0), text: 'PVW' } },
+    ],
+  };
 
-/** Generate per-screen control presets (FTB, Freeze, BKG, OSD, Test Pattern) */
-const getPerScreenControlPresets = (instance) => {
-  const presets = {};
+  presets['take_apply'] = {
+    type: 'simple',
+    name: 'Take',
+    style: { text: 'Take', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [
+      { down: [{ actionId: 'take_switch', options: { manualPlay: 1 } }], up: [] },
+      { down: [{ actionId: 'take_switch', options: { manualPlay: 0 } }], up: [] },
+    ],
+    feedbacks: [
+      { feedbackId: 'pvw_take_selected', style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+    ],
+  };
 
+  presets['ftb_global'] = {
+    type: 'simple',
+    name: 'FTB',
+    style: { text: 'FTB', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [
+      { down: [{ actionId: 'apply_ftb', options: { type: 0 } }], up: [] },
+      { down: [{ actionId: 'apply_ftb', options: { type: 1 } }], up: [] },
+    ],
+    feedbacks: [
+      { feedbackId: 'ftb_selected', style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0) } },
+    ],
+  };
+
+  presets['volume_switch'] = {
+    type: 'simple',
+    name: 'Volume Switch',
+    style: { text: 'Volume\nSwitch', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [
+      { down: [{ actionId: 'apply_volume_switch', options: { isMute: 0 } }], up: [] },
+      { down: [{ actionId: 'apply_volume_switch', options: { isMute: 1 } }], up: [] },
+    ],
+    feedbacks: [
+      { feedbackId: 'volume_switch_selected', style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+    ],
+  };
+
+  presets['screen_frz_global'] = {
+    type: 'simple',
+    name: 'Screen FRZ',
+    style: { text: 'Screen\nFRZ', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [
+      { down: [{ actionId: 'screen_frz_toggle', options: { enable: 1 } }], up: [] },
+      { down: [{ actionId: 'screen_frz_toggle', options: { enable: 0 } }], up: [] },
+    ],
+    feedbacks: [
+      { feedbackId: 'screen_frz', style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0) } },
+    ],
+  };
+
+  presets['layer_frz_global'] = {
+    type: 'simple',
+    name: 'Layer FRZ',
+    style: { text: 'Layer\nFRZ', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [
+      { down: [{ actionId: 'layer_frz_toggle', options: { enable: 1 } }], up: [] },
+      { down: [{ actionId: 'layer_frz_toggle', options: { enable: 0 } }], up: [] },
+    ],
+    feedbacks: [
+      { feedbackId: 'layer_frz', style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0) } },
+    ],
+  };
+
+  presets['volume_add'] = {
+    type: 'simple',
+    name: 'Volume +',
+    style: { text: 'Volume\n+', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [{ down: [{ actionId: 'screen_volume_add', options: {} }], up: [] }],
+    feedbacks: [],
+  };
+
+  presets['volume_minus'] = {
+    type: 'simple',
+    name: 'Volume -',
+    style: { text: 'Volume\n-', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [{ down: [{ actionId: 'screen_volume_minus', options: {} }], up: [] }],
+    feedbacks: [],
+  };
+
+  presets['brightness_add_global'] = {
+    type: 'simple',
+    name: 'Brightness +',
+    style: { text: 'Brightness\n+', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [{ down: [{ actionId: 'screen_brightness_add', options: {} }], up: [] }],
+    feedbacks: [],
+  };
+
+  presets['brightness_minus_global'] = {
+    type: 'simple',
+    name: 'Brightness -',
+    style: { text: 'Brightness\n-', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [{ down: [{ actionId: 'screen_brightness_minus', options: {} }], up: [] }],
+    feedbacks: [],
+  };
+
+  presets['test_pattern_global'] = {
+    type: 'simple',
+    name: 'Test Pattern',
+    style: { text: 'Test\nPattern', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [
+      { down: [{ actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.OPEN } }], up: [] },
+      { down: [{ actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.CLOSE } }], up: [] },
+    ],
+    feedbacks: [
+      { feedbackId: 'test_pattern_selected', style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+    ],
+  };
+
+  presets['bkg_global'] = {
+    type: 'simple',
+    name: 'BKG',
+    style: { text: 'BKG', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [
+      { down: [{ actionId: 'bkg_switch', options: { enable: 1 } }], up: [] },
+      { down: [{ actionId: 'bkg_switch', options: { enable: 0 } }], up: [] },
+    ],
+    feedbacks: [
+      { feedbackId: 'bkg_switch', style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+    ],
+  };
+
+  presets['osd_text_global'] = {
+    type: 'simple',
+    name: 'OSD Text',
+    style: { text: 'OSD\nText', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [
+      { down: [{ actionId: 'osd_switch', options: { enable: 1, osdType: 'text' } }], up: [] },
+      { down: [{ actionId: 'osd_switch', options: { enable: 0, osdType: 'text' } }], up: [] },
+    ],
+    feedbacks: [
+      { feedbackId: 'osd_switch', options: { osdType: 'text' }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+    ],
+  };
+
+  presets['osd_image_global'] = {
+    type: 'simple',
+    name: 'OSD Image',
+    style: { text: 'OSD\nImage', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [
+      { down: [{ actionId: 'osd_switch', options: { enable: 1, osdType: 'image' } }], up: [] },
+      { down: [{ actionId: 'osd_switch', options: { enable: 0, osdType: 'image' } }], up: [] },
+    ],
+    feedbacks: [
+      { feedbackId: 'osd_switch', options: { osdType: 'image' }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+    ],
+  };
+
+  // ---- Global Blackout ----
+  presets['blackout_global'] = {
+    type: 'simple',
+    name: 'Blackout',
+    style: { text: 'BLACKOUT', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+    steps: [
+      { down: [{ actionId: 'blackout', options: { state: 1 } }], up: [] },
+      { down: [{ actionId: 'blackout', options: { state: 0 } }], up: [] },
+    ],
+    feedbacks: [],
+  };
+
+  // ---- Per-screen direct controls (not templatable - each is unique) ----
   instance.screenList?.forEach((screen) => {
     const { name, screenId } = screen;
-    const category = `Control: ${name}`;
 
-    // Per-screen FTB toggle
+    presets[`direct_pgm_pvw_${screenId}`] = {
+      type: 'simple',
+      name: `${name} PGM/PVW`,
+      style: { text: `${name}\nPGM/PVW`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+      steps: [
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'pgm_pvw_switch', options: { enNonTime: 0 } }], up: [] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'pgm_pvw_switch', options: { enNonTime: 1 } }], up: [] },
+      ],
+      feedbacks: [
+        { feedbackId: 'pgm_pvw_switch', options: { type: PGM_PVW_TYPE.PGM }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0), text: `${name}\nPGM` } },
+        { feedbackId: 'pgm_pvw_switch', options: { type: PGM_PVW_TYPE.PVW }, style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0), text: `${name}\nPVW` } },
+      ],
+    };
+
+    presets[`direct_take_${screenId}`] = {
+      type: 'simple',
+      name: `${name} Take`,
+      style: { text: `${name}\nTake`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+      steps: [
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'take_switch', options: { manualPlay: 1 } }], up: [] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'take_switch', options: { manualPlay: 0 } }], up: [] },
+      ],
+      feedbacks: [
+        { feedbackId: 'pvw_take_selected', style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+      ],
+    };
+
     presets[`direct_ftb_${screenId}`] = {
-      type: 'button',
-      category,
+      type: 'simple',
       name: `${name} FTB`,
-      style: {
-        text: `${name}\nFTB`,
-        size: 'auto',
-        color: combineRgb(255, 255, 255),
-        bgcolor: combineRgb(0, 0, 0),
-      },
+      style: { text: `${name}\nFTB`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
       steps: [
-        {
-          down: [
-            { actionId: 'select_screen', options: { screenId, enable: 1 } },
-            { actionId: 'apply_ftb', options: { type: 0 } },
-          ],
-        },
-        {
-          down: [
-            { actionId: 'select_screen', options: { screenId, enable: 1 } },
-            { actionId: 'apply_ftb', options: { type: 1 } },
-          ],
-        },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'apply_ftb', options: { type: 0 } }], up: [] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'apply_ftb', options: { type: 1 } }], up: [] },
       ],
       feedbacks: [
-        {
-          feedbackId: 'ftb_direct',
-          options: { screenId },
-          style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(255, 255, 255) },
-        },
+        { feedbackId: 'ftb_direct', options: { screenId }, style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(255, 255, 255) } },
       ],
     };
 
-    // Per-screen Freeze toggle
     presets[`direct_freeze_${screenId}`] = {
-      type: 'button',
-      category,
+      type: 'simple',
       name: `${name} Freeze`,
-      style: {
-        text: `${name}\nFRZ`,
-        size: 'auto',
-        color: combineRgb(255, 255, 255),
-        bgcolor: combineRgb(0, 0, 0),
-      },
+      style: { text: `${name}\nFRZ`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
       steps: [
-        {
-          down: [
-            { actionId: 'select_screen', options: { screenId, enable: 1 } },
-            { actionId: 'screen_frz_toggle', options: { enable: 1 } },
-          ],
-        },
-        {
-          down: [
-            { actionId: 'select_screen', options: { screenId, enable: 1 } },
-            { actionId: 'screen_frz_toggle', options: { enable: 0 } },
-          ],
-        },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'screen_frz_toggle', options: { enable: 1 } }], up: [] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'screen_frz_toggle', options: { enable: 0 } }], up: [] },
       ],
       feedbacks: [
-        {
-          feedbackId: 'frozen_direct',
-          options: { screenId },
-          style: { bgcolor: combineRgb(0, 0, 255), color: combineRgb(255, 255, 255) },
-        },
+        { feedbackId: 'frozen_direct', options: { screenId }, style: { bgcolor: combineRgb(0, 0, 255), color: combineRgb(255, 255, 255) } },
       ],
     };
 
-    // Per-screen BKG toggle
     presets[`direct_bkg_${screenId}`] = {
-      type: 'button',
-      category,
+      type: 'simple',
       name: `${name} BKG`,
       style: { text: `${name}\nBKG`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
       steps: [
-        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'bkg_switch', options: { enable: 1 } }] },
-        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'bkg_switch', options: { enable: 0 } }] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'bkg_switch', options: { enable: 1 } }], up: [] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'bkg_switch', options: { enable: 0 } }], up: [] },
       ],
       feedbacks: [
         { feedbackId: 'bkg_direct', options: { screenId }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
       ],
     };
 
-    // Per-screen OSD Text toggle
     presets[`direct_osd_text_${screenId}`] = {
-      type: 'button',
-      category,
+      type: 'simple',
       name: `${name} OSD Text`,
       style: { text: `${name}\nOSD Text`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
       steps: [
-        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'osd_switch', options: { enable: 1, osdType: 'text' } }] },
-        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'osd_switch', options: { enable: 0, osdType: 'text' } }] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'osd_switch', options: { enable: 1, osdType: 'text' } }], up: [] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'osd_switch', options: { enable: 0, osdType: 'text' } }], up: [] },
       ],
       feedbacks: [
         { feedbackId: 'osd_text_direct', options: { screenId }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
       ],
     };
 
-    // Per-screen OSD Image toggle
     presets[`direct_osd_image_${screenId}`] = {
-      type: 'button',
-      category,
+      type: 'simple',
       name: `${name} OSD Image`,
       style: { text: `${name}\nOSD Img`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
       steps: [
-        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'osd_switch', options: { enable: 1, osdType: 'image' } }] },
-        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'osd_switch', options: { enable: 0, osdType: 'image' } }] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'osd_switch', options: { enable: 1, osdType: 'image' } }], up: [] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'osd_switch', options: { enable: 0, osdType: 'image' } }], up: [] },
       ],
       feedbacks: [
         { feedbackId: 'osd_image_direct', options: { screenId }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
       ],
     };
 
-    // Per-screen Test Pattern toggle
     presets[`direct_test_${screenId}`] = {
-      type: 'button',
-      category,
+      type: 'simple',
       name: `${name} Test Pattern`,
       style: { text: `${name}\nTest`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
       steps: [
-        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.OPEN } }] },
-        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.CLOSE } }] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.OPEN } }], up: [] },
+        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.CLOSE } }], up: [] },
       ],
       feedbacks: [
         { feedbackId: 'test_pattern_direct', options: { screenId }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
@@ -682,113 +534,204 @@ const getPerScreenControlPresets = (instance) => {
   return presets;
 };
 
-/** Generate per-screen brightness presets (common levels + increment/decrement) */
-const getPerScreenBrightnessPresets = (instance) => {
-  const presets = {};
-  const levels = [
-    { pct: 0, color: combineRgb(80, 80, 80) },
-    { pct: 25, color: combineRgb(100, 100, 0) },
-    { pct: 50, color: combineRgb(180, 180, 0) },
-    { pct: 75, color: combineRgb(200, 160, 0) },
-    { pct: 100, color: combineRgb(255, 255, 255) },
-  ];
+// ============================================================================
+// STRUCTURE: Screen-first hierarchy with template groups
+// ============================================================================
 
-  instance.screenList?.forEach((screen) => {
+const buildStructure = (instance) => {
+  const structure = [];
+  const screens = instance.screenList || [];
+
+  // Per-screen sections
+  screens.forEach((screen) => {
     const { name, screenId } = screen;
-    const category = `Brightness: ${name}`;
+    const groups = [];
 
-    // Common brightness levels
-    levels.forEach(({ pct, color }) => {
-      presets[`direct_bright_${screenId}_${pct}`] = {
-        type: 'button',
-        category,
-        name: `${name} ${pct}%`,
-        style: {
-          text: `${name}\n${pct}%`,
-          size: 'auto',
-          color: combineRgb(0, 0, 0),
-          bgcolor: color,
-        },
-        // Note: This uses select_screen + brightness set pattern
-        // Since there's no "set brightness to X" action in v3.0.2,
-        // we use the feedback to show status only
-        steps: [
-          {
-            down: [
-              { actionId: 'select_screen', options: { screenId, enable: 1 } },
-            ],
-          },
-        ],
-        feedbacks: [
-          {
-            feedbackId: 'brightness_match',
-            options: { screenId, brightness: pct },
-            style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) },
-          },
-        ],
-      };
+    // Select Screen (simple - only one button)
+    groups.push({
+      id: `screen_${screenId}_select`,
+      type: 'simple',
+      name: 'Select Screen',
+      keywords: ['select', 'screen'],
+      presets: [`screen_${screenId}`],
     });
 
-    // Brightness increment
-    presets[`direct_bright_up_${screenId}`] = {
-      type: 'button',
-      category,
-      name: `${name} Brightness +`,
-      style: {
-        text: `${name}\nBright +`,
-        size: 'auto',
-        color: combineRgb(255, 255, 255),
-        bgcolor: combineRgb(0, 0, 0),
-      },
-      steps: [
-        {
-          down: [
-            { actionId: 'select_screen', options: { screenId, enable: 1 } },
-            { actionId: 'screen_brightness_add', options: {} },
-          ],
-        },
-      ],
-      feedbacks: [],
-    };
+    // Preset Recall (template - one preset generates N buttons)
+    const screenPresets = screen.presets || [];
+    if (screenPresets.length > 0) {
+      groups.push({
+        id: `screen_${screenId}_presets`,
+        type: 'template',
+        name: 'Preset Recall',
+        keywords: ['preset', 'recall', 'scene', 'load'],
+        presetId: `tpl_preset_recall_${screenId}`,
+        templateVariableName: 'presetIndex',
+        templateValues: screenPresets.map((p) => ({
+          name: p.name || `Preset ${p.presetId + 1}`,
+          value: p.presetId,
+        })),
+      });
+    }
 
-    // Brightness decrement
-    presets[`direct_bright_down_${screenId}`] = {
-      type: 'button',
-      category,
-      name: `${name} Brightness -`,
-      style: {
-        text: `${name}\nBright -`,
-        size: 'auto',
-        color: combineRgb(255, 255, 255),
-        bgcolor: combineRgb(0, 0, 0),
-      },
-      steps: [
-        {
-          down: [
-            { actionId: 'select_screen', options: { screenId, enable: 1 } },
-            { actionId: 'screen_brightness_minus', options: {} },
-          ],
-        },
+    // Layers (template - one preset generates N buttons)
+    const screenLayers = screen.layers || [];
+    if (screenLayers.length > 0) {
+      groups.push({
+        id: `screen_${screenId}_layers`,
+        type: 'template',
+        name: 'Layers',
+        keywords: ['layer', 'select'],
+        presetId: `tpl_layer_select_${screenId}`,
+        templateVariableName: 'layerIndex',
+        templateValues: screenLayers.map((l) => ({
+          name: l.name || `Layer ${l.layerId + 1}`,
+          value: l.layerId,
+        })),
+      });
+    }
+
+    // Brightness (template for levels + simple for +/-)
+    const brightnessLevels = [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0];
+    groups.push({
+      id: `screen_${screenId}_brightness_levels`,
+      type: 'template',
+      name: 'Brightness Levels',
+      keywords: ['brightness', 'dim', 'level', 'percent'],
+      presetId: `tpl_brightness_${screenId}`,
+      templateVariableName: 'brightnessLevel',
+      templateValues: brightnessLevels.map((pct) => ({ name: `${pct}%`, value: pct })),
+    });
+
+    groups.push({
+      id: `screen_${screenId}_brightness_adjust`,
+      type: 'simple',
+      name: 'Brightness Adjust',
+      keywords: ['brightness', 'adjust', 'up', 'down'],
+      presets: [
+        `direct_bright_up_${screenId}`,
+        `direct_bright_down_${screenId}`,
       ],
-      feedbacks: [],
-    };
+    });
+
+    // Controls (simple - each is unique)
+    groups.push({
+      id: `screen_${screenId}_controls`,
+      type: 'simple',
+      name: 'Controls',
+      keywords: ['pgm', 'pvw', 'take', 'ftb', 'freeze', 'background', 'osd', 'control'],
+      presets: [
+        `direct_pgm_pvw_${screenId}`,
+        `direct_take_${screenId}`,
+        `direct_ftb_${screenId}`,
+        `direct_freeze_${screenId}`,
+        `direct_bkg_${screenId}`,
+        `direct_osd_text_${screenId}`,
+        `direct_osd_image_${screenId}`,
+      ],
+    });
+
+    // Test Pattern (simple - single button)
+    groups.push({
+      id: `screen_${screenId}_test_pattern`,
+      type: 'simple',
+      name: 'Test Pattern',
+      keywords: ['test', 'pattern', 'test pattern', 'grid'],
+      presets: [
+        `direct_test_${screenId}`,
+      ],
+    });
+
+    structure.push({
+      id: `section_screen_${screenId}`,
+      name: name,
+      keywords: ['screen', `screen ${screenId + 1}`, name.toLowerCase()],
+      definitions: groups,
+    });
   });
 
-  return presets;
+  // Section: Global Display Controls
+  structure.push({
+    id: 'section_global',
+    name: 'Global Display',
+    keywords: ['global', 'display', 'transport', 'volume', 'brightness'],
+    definitions: [
+      {
+        id: 'global_transport',
+        type: 'simple',
+        name: 'Transport',
+        presets: ['pgm_pvw_switch', 'take_apply'],
+      },
+      {
+        id: 'global_controls',
+        type: 'simple',
+        name: 'Controls',
+        presets: [
+          'ftb_global',
+          'screen_frz_global',
+          'layer_frz_global',
+          'bkg_global',
+          'osd_text_global',
+          'osd_image_global',
+        ],
+      },
+      {
+        id: 'global_test_pattern',
+        type: 'simple',
+        name: 'Test Pattern',
+        keywords: ['test', 'pattern', 'grid'],
+        presets: ['test_pattern_global'],
+      },
+      {
+        id: 'global_volume',
+        type: 'simple',
+        name: 'Volume',
+        presets: ['volume_switch', 'volume_add', 'volume_minus'],
+      },
+      {
+        id: 'global_brightness',
+        type: 'simple',
+        name: 'Brightness',
+        presets: ['brightness_add_global', 'brightness_minus_global'],
+      },
+      {
+        id: 'global_blackout',
+        type: 'simple',
+        name: 'Blackout',
+        keywords: ['blackout', 'all', 'off'],
+        presets: ['blackout_global'],
+      },
+    ],
+  });
+
+  // Section: Preset Groups (flat list)
+  const groupIds = (instance.presetCollectionList || []).map((g) => `preset_group_${g.presetCollectionId}`);
+  if (groupIds.length > 0) {
+    structure.push({
+      id: 'section_preset_groups',
+      name: 'Preset Groups',
+      definitions: groupIds,
+    });
+  }
+
+  // Section: Source List (flat list)
+  const sourceIds = (instance.sourceList || []).map((s) => `source_${s.inputId}_${s.cropId}`);
+  if (sourceIds.length > 0) {
+    structure.push({
+      id: 'section_sources',
+      name: 'Source List',
+      definitions: sourceIds,
+    });
+  }
+
+  return structure;
 };
 
+// ============================================================================
+// EXPORT
+// ============================================================================
+
 export const getPresetDefinitions = function (instance) {
-  const { screenPresets, layerPresets, presetPresets } = getSLPPresets(instance.screenList);
-  return {
-    // Original v3.0.2 presets (presets now per-screen categories)
-    ...screenPresets,
-    ...layerPresets,
-    ...presetPresets,
-    ...getPresetCollectionsPresets(instance),
-    ...getSourceListPresets(instance),
-    ...applyScreenPreset(),
-    // Enhanced per-screen direct presets
-    ...getPerScreenControlPresets(instance),
-    ...getPerScreenBrightnessPresets(instance),
-  };
+  const presets = buildAllPresets(instance);
+  const structure = buildStructure(instance);
+  return { structure, presets };
 };
