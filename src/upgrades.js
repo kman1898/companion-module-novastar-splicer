@@ -1,6 +1,6 @@
 import { OLD_ACTION_TO_NEW, OLD_FEEDBACK_TO_NEW } from '../utils/constant.js';
 
-export const upgradeScripts = [
+export const UpgradeScripts = [
   /*
    * Place your upgrade scripts here
    * Remember that once it has been added it cannot be removed!
@@ -15,7 +15,12 @@ export const upgradeScripts = [
     for (const action of actions) {
       if (OLD_ACTION_TO_NEW[action.actionId]) {
         action.actionId = OLD_ACTION_TO_NEW[action.actionId];
-        action.options.deviceId = 0;
+        // Handle both old plain values and new { isExpression, value } shape
+        if (action.options.deviceId && typeof action.options.deviceId === 'object') {
+          action.options.deviceId.value = 0;
+        } else {
+          action.options.deviceId = { isExpression: false, value: 0 };
+        }
         result.updatedActions.push(action);
       }
     }

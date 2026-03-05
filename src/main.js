@@ -1,7 +1,7 @@
 import { InstanceBase, InstanceStatus, Regex, UDPHelper } from '@companion-module/base';
 
 import { ACTIONS_CMD, PRODUCTS_INFORMATION } from '../utils/constant.js';
-import { upgradeScripts } from './upgrades.js';
+import { UpgradeScripts } from './upgrades.js';
 
 import { EventEmitter } from 'events';
 import { HeartbeatManager } from '../utils/heartbeat.js';
@@ -89,6 +89,27 @@ class ModuleInstance extends InstanceBase {
     this.enhancedState = {
       screens: {},
     };
+  }
+
+  // ========== Safe UDP send wrapper ==========
+
+  /** Send data via UDP with error handling to prevent crashes */
+  safeSend(data) {
+    if (!this.udp) {
+      this.log('debug', 'safeSend: no UDP socket');
+      return;
+    }
+    try {
+      this.udp.send(data);
+    } catch (err) {
+      this.log('warn', `UDP send error: ${err.message}`);
+      this.connectStatus = false;
+      if (this.config.offlineMode) {
+        this.updateStatus(InstanceStatus.Ok, 'Offline Programming Mode');
+      } else {
+        this.updateStatus(InstanceStatus.ConnectionFailure);
+      }
+    }
   }
 
   // ========== ENHANCED: Per-screen state management ==========
@@ -391,7 +412,7 @@ class ModuleInstance extends InstanceBase {
         max: 30000,
         default: 1000,
         tooltip: 'How often to poll the device for state updates (500-30000ms)',
-        isVisible: (config) => !!config.host,
+        isVisibleExpression: '!!$(options:host)',
       },
       // Device size configuration (always available for offline programming)
       {
@@ -637,7 +658,7 @@ class ModuleInstance extends InstanceBase {
   sendInitStatusRequest() {
     this.log('debug', 'Sending initial status request...');
     if (this.udp) {
-      this.udp.send(Buffer.from(JSON.stringify([{ cmd: ACTIONS_CMD.get_device_init_status, param0: this.deviceId }])));
+      this.safeSend(Buffer.from(JSON.stringify([{ cmd: ACTIONS_CMD.get_device_init_status, param0: this.deviceId }])));
     }
   }
 
@@ -668,7 +689,7 @@ class ModuleInstance extends InstanceBase {
 
   sendHeartbeat() {
     if (this.udp) {
-      this.udp.send(Buffer.from(JSON.stringify([{ cmd: ACTIONS_CMD.device_heartbeat, deviceId: this.deviceId }])));
+      this.safeSend(Buffer.from(JSON.stringify([{ cmd: ACTIONS_CMD.device_heartbeat, deviceId: this.deviceId }])));
     }
   }
 
@@ -764,4 +785,4 @@ class ModuleInstance extends InstanceBase {
 }
 
 export default ModuleInstance;
-export { upgradeScripts };
+export { UpgradeScripts };

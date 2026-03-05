@@ -119,7 +119,7 @@ export const getActions = (instance) => {
           screenId,
           presetId,
         });
-        instance.udp.send(command);
+        instance.safeSend(command);
       },
     },
     // 发送命令
@@ -143,7 +143,7 @@ export const getActions = (instance) => {
         if (!instance.connectStatus) return;
         try {
           const params = Buffer.from(command);
-          instance.udp.send(params);
+          instance.safeSend(params);
         } catch (error) {
           instance.log('error', 'send command error');
         }
@@ -376,7 +376,7 @@ export const getActions = (instance) => {
         }
         instance.selectedScreenList.forEach((screenId) => {
           instance.log('debug', { screenId, enable });
-          instance.udp.send(handleParams(ACTIONS_CMD.screen_frz, { screenId, enable }));
+          instance.safeSend(handleParams(ACTIONS_CMD.screen_frz, { screenId, enable }));
         });
       },
     },
@@ -396,7 +396,7 @@ export const getActions = (instance) => {
             volume: volume,
             isMute: 0,
           });
-          instance.udp.send(command);
+          instance.safeSend(command);
         });
       },
     },
@@ -416,7 +416,7 @@ export const getActions = (instance) => {
             volume: volume,
             isMute: 0,
           });
-          instance.udp.send(command);
+          instance.safeSend(command);
         });
       },
     },
@@ -437,7 +437,7 @@ export const getActions = (instance) => {
             screenId,
             brightness: brightness,
           });
-          instance.udp.send(command);
+          instance.safeSend(command);
         });
       },
     },
@@ -458,7 +458,7 @@ export const getActions = (instance) => {
             screenId,
             brightness: brightness,
           });
-          instance.udp.send(command);
+          instance.safeSend(command);
         });
       },
     },
@@ -504,7 +504,7 @@ export const getActions = (instance) => {
           screenId,
           brightness,
         });
-        instance.udp.send(command);
+        instance.safeSend(command);
       },
     },
     // Save current brightness to LED receiving card hardware (W0417)
@@ -527,7 +527,7 @@ export const getActions = (instance) => {
         const command = handleParams(ACTIONS_CMD.save_screen_brightness, {
           screenId,
         });
-        instance.udp.send(command);
+        instance.safeSend(command);
       },
     },
     // ==================== Direct per-screen actions ====================
@@ -561,7 +561,7 @@ export const getActions = (instance) => {
         const state = parseInt(event.options.state);
         instance.updateEnhancedFromAction(screenId, 'frozen', state === 1);
         if (!instance.connectStatus) return;
-        instance.udp.send(handleParams(ACTIONS_CMD.screen_frz, { screenId, enable: state }));
+        instance.safeSend(handleParams(ACTIONS_CMD.screen_frz, { screenId, enable: state }));
       },
     },
     // Direct FTB (W0409) - per screen
@@ -597,7 +597,7 @@ export const getActions = (instance) => {
           screenId,
           type: state === 1 ? 0 : 1,
         });
-        instance.udp.send(command);
+        instance.safeSend(command);
       },
     },
     // Direct BKG (W040B) - per screen
@@ -629,7 +629,7 @@ export const getActions = (instance) => {
         instance.updateEnhancedFromAction(screenId, 'bkg', state === 1);
         if (!instance.connectStatus) return;
         const params = { screenId, enable: state, bkgId: 0 };
-        instance.udp.send(handleParams(ACTIONS_CMD.bkg_switch, params));
+        instance.safeSend(handleParams(ACTIONS_CMD.bkg_switch, params));
       },
     },
     // Direct OSD (W040C) - per screen
@@ -662,7 +662,7 @@ export const getActions = (instance) => {
         instance.updateEnhancedFromAction(screenId, 'osdImage', state === 1);
         if (!instance.connectStatus) return;
         const params = { screenId, Osd: { enable: state } };
-        instance.udp.send(handleParams(ACTIONS_CMD.osd_switch, params));
+        instance.safeSend(handleParams(ACTIONS_CMD.osd_switch, params));
       },
     },
     /** 图层冻结 */
@@ -698,7 +698,7 @@ export const getActions = (instance) => {
           instance.log('error', 'Please select a layer');
           return;
         }
-        instance.udp.send(
+        instance.safeSend(
           handleParams(ACTIONS_CMD.layer_frz, {
             layerId: instance.selectedLayerInfo.layerId,
             screenId: instance.selectedLayerInfo.screenId,
@@ -728,7 +728,7 @@ export const getActions = (instance) => {
         instance.checkFeedbacks("source_switch_selected");
         if (!instance.connectStatus) return;
         if (!source || !instance.selectedLayerInfo) return;
-        instance.udp.send(
+        instance.safeSend(
           handleParams(ACTIONS_CMD.source_switch, {
             inputId: source.inputId,
             sourceType: source.sourceType,
@@ -972,7 +972,7 @@ export const getActions = (instance) => {
         const command = handleParams(ACTIONS_CMD.blackout, {
           blackout: state,
         });
-        instance.udp.send(command);
+        instance.safeSend(command);
       },
     },
   };
