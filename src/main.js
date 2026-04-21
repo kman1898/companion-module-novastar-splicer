@@ -86,6 +86,23 @@ class ModuleInstance extends InstanceBase {
     this.selectedPresetInfo = null;
   }
 
+  /**
+   * Send data via UDP with error handling so transport errors don't
+   * crash the instance. Flips status to ConnectionFailure on failure.
+   */
+  safeSend(data) {
+    if (!this.udp) {
+      this.log('debug', 'safeSend: no UDP socket');
+      return;
+    }
+    try {
+      this.udp.send(data);
+    } catch (err) {
+      this.log('warn', `UDP send error: ${err.message}`);
+      this.updateStatus(InstanceStatus.ConnectionFailure);
+    }
+  }
+
   handleGetAllData() {
     this.getAllData();
     this.updateAll();
@@ -324,7 +341,7 @@ class ModuleInstance extends InstanceBase {
   sendInitStatusRequest() {
     this.log('debug', 'Sending initial status request...');
     if (this.udp) {
-      this.udp.send(Buffer.from(JSON.stringify([{ cmd: ACTIONS_CMD.get_device_init_status, param0: this.deviceId }])));
+      this.safeSend(Buffer.from(JSON.stringify([{ cmd: ACTIONS_CMD.get_device_init_status, param0: this.deviceId }])));
     }
   }
 
@@ -355,7 +372,7 @@ class ModuleInstance extends InstanceBase {
 
   sendHeartbeat() {
     if (this.udp) {
-      this.udp.send(Buffer.from(JSON.stringify([{ cmd: ACTIONS_CMD.device_heartbeat, deviceId: this.deviceId }])));
+      this.safeSend(Buffer.from(JSON.stringify([{ cmd: ACTIONS_CMD.device_heartbeat, deviceId: this.deviceId }])));
     }
   }
 
