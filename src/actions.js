@@ -118,7 +118,7 @@ export const getActions = (instance) => {
           screenId,
           presetId,
         });
-        instance.udp.send(command);
+        instance.safeSend(command);
       },
     },
     // 发送命令
@@ -141,7 +141,7 @@ export const getActions = (instance) => {
         } = event;
         try {
           const params = Buffer.from(command);
-          instance.udp.send(params);
+          instance.safeSend(params);
         } catch (error) {
           instance.log('error', 'send command error');
         }
@@ -360,7 +360,7 @@ export const getActions = (instance) => {
         }
         instance.selectedScreenList.forEach((screenId) => {
           instance.log('debug', { screenId, enable });
-          instance.udp.send(handleParams(ACTIONS_CMD.screen_frz, { screenId, enable }));
+          instance.safeSend(handleParams(ACTIONS_CMD.screen_frz, { screenId, enable }));
         });
       },
     },
@@ -379,7 +379,7 @@ export const getActions = (instance) => {
             volume: volume,
             isMute: 0,
           });
-          instance.udp.send(command);
+          instance.safeSend(command);
         });
       },
     },
@@ -398,7 +398,7 @@ export const getActions = (instance) => {
             volume: volume,
             isMute: 0,
           });
-          instance.udp.send(command);
+          instance.safeSend(command);
         });
       },
     },
@@ -416,7 +416,7 @@ export const getActions = (instance) => {
             screenId,
             brightness: brightness,
           });
-          instance.udp.send(command);
+          instance.safeSend(command);
         });
       },
     },
@@ -434,7 +434,7 @@ export const getActions = (instance) => {
             screenId,
             brightness: brightness,
           });
-          instance.udp.send(command);
+          instance.safeSend(command);
         });
       },
     },
@@ -470,7 +470,7 @@ export const getActions = (instance) => {
           instance.log('error', 'Please select a layer');
           return;
         }
-        instance.udp.send(
+        instance.safeSend(
           handleParams(ACTIONS_CMD.layer_frz, {
             layerId: instance.selectedLayerInfo.layerId,
             screenId: instance.selectedLayerInfo.screenId,
@@ -499,7 +499,7 @@ export const getActions = (instance) => {
         instance.selectedSourceId = id;
         instance.checkFeedbacks();
         if (!source || !instance.selectedLayerInfo) return;
-        instance.udp.send(
+        instance.safeSend(
           handleParams(ACTIONS_CMD.source_switch, {
             inputId: source.inputId,
             sourceType: source.sourceType,
