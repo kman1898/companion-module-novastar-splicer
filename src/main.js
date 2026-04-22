@@ -256,19 +256,26 @@ class ModuleInstance extends InstanceBase {
     }
 
     this.presetCollectionList = [];
-    // Synthetic input source entries so source dropdowns populate offline
+    // Synthetic input source entries so source dropdowns populate offline.
+    // `inputId = slot * 4 + conn` gives a unique identifier across all cards;
+    // formatSourceVariable builds `source_${inputId}_${cropId}` variable ids,
+    // so duplicate inputIds would collide and only the last entry would show.
     this.sourceList = [];
     for (let slot = 0; slot < inputCardCount; slot++) {
       for (let conn = 0; conn < 4; conn++) {
+        const inputId = slot * 4 + conn;
         this.sourceList.push({
-          id: `offline_input_${slot + 1}_${conn + 1}`,
+          inputId,
+          cropId: 255,
+          streamId: 0,
+          templateId: 0,
+          sourceType: 1,
           groupName: 'Video Inputs',
           name: `Input ${slot + 1}-${conn + 1}`,
           inputName: `Input ${slot + 1}-${conn + 1}`,
           slotId: slot,
           interfaceId: conn,
-          templateId: 0,
-          cropId: 255,
+          online: 1,
         });
       }
     }
