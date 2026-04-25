@@ -540,11 +540,24 @@ class ModuleInstance extends InstanceBase {
         this.updateStatus(InstanceStatus.Ok, 'Offline Programming Mode');
         return;
       } else {
-        // Leaving offline mode — clear synthetic data, let host path take over
+        // Leaving offline mode — clear synthetic data and immediately fetch
+        // real device state so Presets/Feedback refresh without needing a
+        // host change or polling cycle.
         this.screenList = [];
         this.presetCollectionList = [];
         this.sourceList = [];
+        this.connectStatus = false;
         this.updateAll();
+        if (this.config.host) {
+          this.updateStatus(InstanceStatus.Connecting);
+          this.heartbeatManager.stop();
+          this.clearInitStatusTimer();
+          this.initUDP();
+          this.handleGetAllData();
+        } else {
+          this.updateStatus(InstanceStatus.Disconnected, 'No host configured');
+        }
+        return;
       }
     }
 
