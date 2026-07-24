@@ -5,6 +5,12 @@ import { MODULE_NAME, PGM_PVW_TYPE, TEST_PATTERN_TYPE } from '../utils/constant.
 // preset builder and the structure builder so the two never drift.
 const BRIGHTNESS_LEVELS = [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0];
 
+// Number of hold-to-ramp steps baked into the direct Brightness +/- buttons.
+// Each is 1%, fired one ramp-interval after the last via runWhileHeld delay
+// groups, so 100 covers a full 0-100 traverse. Companion cancels pending
+// groups on release, so a partial hold just stops where you let go.
+const BRIGHTNESS_RAMP_STEPS = 100;
+
 // ============================================================================
 // Screen-first preset layout with template groups
 // ============================================================================
@@ -146,19 +152,24 @@ const buildAllPresets = (instance) => {
   instance.screenList?.forEach((screen) => {
     const { name, screenId } = screen;
 
-    // Hold to ramp: press starts a continuous ramp (one immediate step so a
-    // quick tap still nudges 1%), release stops it. The module drives the
-    // repeat internally (Companion fires held groups once, not on a loop).
+    // Hold to ramp: one step on press, then another every `rampMs` while the
+    // button stays held (runWhileHeld delay groups). No release action needed —
+    // Companion cancels the pending groups the instant you let go. Ramp speed
+    // comes from the Brightness Hold-Ramp Speed config field.
+    const rampMs = Math.max(20, Math.min(2000, Number(instance.config?.brightnessRampMs) || 100));
+    const buildRampStep = (actionId) => {
+      const step = { down: [{ actionId, options: { screenId } }], up: [] };
+      for (let i = 1; i <= BRIGHTNESS_RAMP_STEPS; i++) {
+        step[i * rampMs] = { options: { runWhileHeld: true }, actions: [{ actionId, options: { screenId } }] };
+      }
+      return step;
+    };
+
     presets[`direct_bright_up_${screenId}`] = {
       type: 'simple',
       name: `${name} Brightness +`,
       style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nBright +`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-      steps: [
-        {
-          down: [{ actionId: 'brightness_ramp_up', options: { screenId } }],
-          up: [{ actionId: 'brightness_ramp_stop', options: { screenId } }],
-        },
-      ],
+      steps: [buildRampStep('brightness_add_direct')],
       feedbacks: [],
     };
 
@@ -166,12 +177,7 @@ const buildAllPresets = (instance) => {
       type: 'simple',
       name: `${name} Brightness -`,
       style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nBright -`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-      steps: [
-        {
-          down: [{ actionId: 'brightness_ramp_down', options: { screenId } }],
-          up: [{ actionId: 'brightness_ramp_stop', options: { screenId } }],
-        },
-      ],
+      steps: [buildRampStep('brightness_minus_direct')],
       feedbacks: [],
     };
 

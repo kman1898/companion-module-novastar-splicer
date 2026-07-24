@@ -441,34 +441,6 @@ export const getActions = (instance) => {
         instance.safeSend(handleParams(ACTIONS_CMD.apply_screen_brightness, { screenId, brightness }));
       },
     },
-    // Hold-to-ramp brightness. Use ramp_up/ramp_down as the button DOWN action
-    // and ramp_stop as the button UP (release) action. The module runs the
-    // repeat internally (Companion fires held action groups once, not on a
-    // loop), so holding the button ramps brightness until release.
-    brightness_ramp_up: {
-      name: 'Brightness Ramp + (Hold)',
-      description: 'Hold to continuously increase brightness on a screen. Put on the button DOWN action; pair with Brightness Ramp Stop on release.',
-      options: [
-        { type: 'dropdown', label: 'Screen', id: 'screenId', default: screenListDropDown[0]?.id ?? null, choices: screenListDropDown },
-      ],
-      callback: (event) => instance.startBrightnessRamp(event.options.screenId, 1),
-    },
-    brightness_ramp_down: {
-      name: 'Brightness Ramp - (Hold)',
-      description: 'Hold to continuously decrease brightness on a screen. Put on the button DOWN action; pair with Brightness Ramp Stop on release.',
-      options: [
-        { type: 'dropdown', label: 'Screen', id: 'screenId', default: screenListDropDown[0]?.id ?? null, choices: screenListDropDown },
-      ],
-      callback: (event) => instance.startBrightnessRamp(event.options.screenId, -1),
-    },
-    brightness_ramp_stop: {
-      name: 'Brightness Ramp Stop (Release)',
-      description: 'Stop a brightness ramp on a screen. Put on the button UP (release) action.',
-      options: [
-        { type: 'dropdown', label: 'Screen', id: 'screenId', default: screenListDropDown[0]?.id ?? null, choices: screenListDropDown },
-      ],
-      callback: (event) => instance.stopBrightnessRamp(event.options.screenId),
-    },
     set_brightness: {
       name: 'Set Brightness',
       description: 'Set brightness of a specific screen to an absolute value (0-100). Supports variables.',
