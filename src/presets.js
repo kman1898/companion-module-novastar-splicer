@@ -156,7 +156,7 @@ const buildAllPresets = (instance) => {
     // button stays held (runWhileHeld delay groups). No release action needed —
     // Companion cancels the pending groups the instant you let go. Ramp speed
     // comes from the Brightness Hold-Ramp Speed config field.
-    const rampMs = Math.max(20, Math.min(2000, Number(instance.config?.brightnessRampMs) || 100));
+    const rampMs = Math.max(20, Math.min(2000, Number(instance.config?.brightnessRampMs) || 200));
     const buildRampStep = (actionId) => {
       const step = { down: [{ actionId, options: { screenId } }], up: [] };
       for (let i = 1; i <= BRIGHTNESS_RAMP_STEPS; i++) {

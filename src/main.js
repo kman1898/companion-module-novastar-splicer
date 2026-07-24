@@ -43,7 +43,7 @@ const DEFAULT_CONFIG = {
   screenCount: 1,
   inputCardCount: 1,
   inputSignalPolling: false,
-  brightnessRampMs: 100,
+  brightnessRampMs: 200,
 };
 
 /**
@@ -512,9 +512,9 @@ class ModuleInstance extends InstanceBase {
         width: 6,
         min: 20,
         max: 2000,
-        default: 100,
+        default: 200,
         tooltip:
-          'How fast the direct Brightness +/- buttons ramp while held: milliseconds between each 1% step (lower = faster). Applies to newly added preset buttons.',
+          'How fast the direct Brightness +/- buttons ramp while held: milliseconds between each 1% step (lower = faster). Set any value here; it applies to newly added preset buttons.',
       },
       {
         type: 'static-text',
