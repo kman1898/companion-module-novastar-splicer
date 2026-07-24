@@ -28,6 +28,39 @@ import { getActions } from './actions.js';
 import { getFeedbacks } from './feedbacks.js';
 import { getPresetDefinitions } from './presets.js';
 
+// Fallback config defaults. Companion applies a config field's `default` only
+// when a brand-new connection is created; it does NOT backfill defaults onto a
+// connection whose stored config predates a field (e.g. after importing this
+// module over an existing connection, or on Companion 5.0 where the field
+// defaults are not re-applied). Without this, pollInterval shows 0 and the
+// offline counts show blank. We merge these UNDER the stored config and, when a
+// value was actually missing, persist it so the config UI reflects the default.
+const DEFAULT_CONFIG = {
+  host: '127.0.0.1',
+  port: '6000',
+  pollInterval: 1000,
+  offlineMode: false,
+  screenCount: 1,
+  inputCardCount: 1,
+  inputSignalPolling: false,
+};
+
+/**
+ * Merge DEFAULT_CONFIG under `config`, returning the normalized config and
+ * whether any default had to be filled in (so the caller can persist it).
+ */
+function applyConfigDefaults(config) {
+  const merged = { ...config };
+  let filledMissing = false;
+  for (const [key, value] of Object.entries(DEFAULT_CONFIG)) {
+    if (merged[key] === undefined || merged[key] === null || merged[key] === '') {
+      merged[key] = value;
+      filledMissing = true;
+    }
+  }
+  return { config: merged, filledMissing };
+}
+
 class ModuleInstance extends InstanceBase {
   constructor(internal) {
     super(internal);
@@ -242,10 +275,14 @@ class ModuleInstance extends InstanceBase {
   }
 
   async init(config) {
-    this.config = {
+    const { config: normalized, filledMissing } = applyConfigDefaults({
       ...this.config,
       ...config,
-    };
+    });
+    this.config = normalized;
+    // Persist the filled-in defaults so the config UI shows real values
+    // (e.g. poll interval 1000, screen/input counts) instead of 0/blank.
+    if (filledMissing) this.saveConfig(this.config);
 
     // Build banner so the loaded version is visible in the connection log.
     this.log('info', `${PRODUCTS_INFORMATION}`);
@@ -626,17 +663,16 @@ class ModuleInstance extends InstanceBase {
   /** devices cmd handle end */
 
   async configUpdated(config) {
-    const hostChanged = this.config.host != config.host;
-    const offlineModeChanged = this.config.offlineMode !== config.offlineMode;
+    const { config: normalized } = applyConfigDefaults({ ...this.config, ...config });
+
+    const hostChanged = this.config.host != normalized.host;
+    const offlineModeChanged = this.config.offlineMode !== normalized.offlineMode;
     const sizeChanged =
-      this.config.screenCount !== config.screenCount || this.config.inputCardCount !== config.inputCardCount;
+      this.config.screenCount !== normalized.screenCount || this.config.inputCardCount !== normalized.inputCardCount;
 
     this.log('info', 'configUpdated module....');
 
-    this.config = {
-      ...this.config,
-      ...config,
-    };
+    this.config = normalized;
 
     // If offline mode is on and size changed, regenerate synthetic data
     if (sizeChanged && this.config.offlineMode) {
