@@ -13,6 +13,7 @@ import {
   formatScreenVariable,
   formatSourceList,
   formatSourceVariable,
+  handleParams,
   sendUDPRequestsSync,
 } from '../utils/index.js';
 import {
@@ -43,7 +44,6 @@ const DEFAULT_CONFIG = {
   screenCount: 1,
   inputCardCount: 1,
   inputSignalPolling: false,
-  brightnessRampMs: 200,
 };
 
 /**
@@ -75,6 +75,8 @@ class ModuleInstance extends InstanceBase {
     this.sourceList = [];
     /** 选中的屏幕列表 */
     this.selectedScreenList = [];
+    /** Per-screen brightness hold-to-ramp interval handles (keyed by screenId) */
+    this.brightnessRampTimers = {};
     /** 选中的图层 */
     this.selectedLayerInfo = null;
     /** 定时器句柄 */
@@ -130,6 +132,60 @@ class ModuleInstance extends InstanceBase {
      * (Get Slot Information) responses when input signal polling is enabled.
      */
     this.inputSignalState = {};
+  }
+
+  /**
+   * Apply a single relative brightness step to a screen and push it to the
+   * device. Shared by the direct +/- actions and the hold-to-ramp timer.
+   * Returns the new brightness (0-100), or undefined if the screen is unknown.
+   */
+  stepBrightness(screenId, delta) {
+    const details = this.screenList?.find((s) => s.screenId === screenId)?.details;
+    if (!details) return undefined;
+    const brightness = Math.max(0, Math.min(100, (details.brightness ?? 100) + delta));
+    details.brightness = brightness;
+    this.updateEnhancedFromAction(screenId, 'brightness', brightness);
+    this.safeSend(handleParams(ACTIONS_CMD.apply_screen_brightness, { screenId, brightness }));
+    return brightness;
+  }
+
+  /**
+   * Start a hold-to-ramp on a screen's brightness. `ms` is the per-button step
+   * cadence (comes from the ramp action's ms option). Fires one step
+   * immediately (so a quick tap still nets a single step) then keeps stepping
+   * every `ms` until stopBrightnessRamp (button release), a 0/100 boundary, or
+   * a failsafe max duration (in case a release event is ever missed). delta is
+   * +1 or -1.
+   */
+  startBrightnessRamp(screenId, delta, ms) {
+    this.stopBrightnessRamp(screenId);
+    const rampMs = Math.max(20, Math.min(2000, Number(ms) || 200));
+    const MAX_MS = 30000; // failsafe: never ramp longer than this without a release
+    let elapsed = 0;
+    const first = this.stepBrightness(screenId, delta);
+    if (first === undefined) return; // unknown screen, nothing to ramp
+    this.brightnessRampTimers[screenId] = setInterval(() => {
+      elapsed += rampMs;
+      const v = this.stepBrightness(screenId, delta);
+      if (v === undefined || v <= 0 || v >= 100 || elapsed >= MAX_MS) this.stopBrightnessRamp(screenId);
+    }, rampMs);
+  }
+
+  /** Stop a screen's brightness ramp (button release). */
+  stopBrightnessRamp(screenId) {
+    const timer = this.brightnessRampTimers?.[screenId];
+    if (timer) {
+      clearInterval(timer);
+      delete this.brightnessRampTimers[screenId];
+    }
+  }
+
+  /** Clear every active brightness ramp (used on destroy). */
+  stopAllBrightnessRamps() {
+    for (const key of Object.keys(this.brightnessRampTimers || {})) {
+      clearInterval(this.brightnessRampTimers[key]);
+    }
+    this.brightnessRampTimers = {};
   }
 
   /** Initialize per-screen enhanced state with defaults */
@@ -506,17 +562,6 @@ class ModuleInstance extends InstanceBase {
         tooltip: 'How often to poll the device for state updates (500-30000ms). Lower = more responsive feedback at the cost of more UDP traffic.',
       },
       {
-        type: 'number',
-        id: 'brightnessRampMs',
-        label: 'Brightness Hold-Ramp Speed (ms/step)',
-        width: 6,
-        min: 20,
-        max: 2000,
-        default: 200,
-        tooltip:
-          'How fast the direct Brightness +/- buttons ramp while held: milliseconds between each 1% step (lower = faster). Set any value here; it applies to newly added preset buttons.',
-      },
-      {
         type: 'static-text',
         id: 'offline_heading',
         width: 12,
@@ -624,6 +669,7 @@ class ModuleInstance extends InstanceBase {
   // When module gets deleted
   async destroy() {
     this.log('info', 'destroy:' + this.id);
+    this.stopAllBrightnessRamps();
     if (this.udp !== undefined) {
       this.udp.destroy();
     }
@@ -687,9 +733,6 @@ class ModuleInstance extends InstanceBase {
     const offlineModeChanged = this.config.offlineMode !== normalized.offlineMode;
     const sizeChanged =
       this.config.screenCount !== normalized.screenCount || this.config.inputCardCount !== normalized.inputCardCount;
-    // Ramp speed is baked into the direct brightness presets, so rebuild them
-    // when it changes (newly added buttons pick up the new cadence).
-    const rampChanged = this.config.brightnessRampMs !== normalized.brightnessRampMs;
 
     this.log('info', 'configUpdated module....');
 
@@ -748,10 +791,6 @@ class ModuleInstance extends InstanceBase {
       this.clearInitStatusTimer();
       this.initUDP();
       this.handleGetAllData();
-    } else if (rampChanged) {
-      // Only the ramp speed changed — rebuild definitions so the direct
-      // brightness presets carry the new cadence.
-      this.updateAll();
     }
   }
 
