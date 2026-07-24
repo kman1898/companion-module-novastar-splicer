@@ -13,6 +13,7 @@ import {
   formatScreenVariable,
   formatSourceList,
   formatSourceVariable,
+  handleParams,
   sendUDPRequestsSync,
 } from '../utils/index.js';
 import {
@@ -74,6 +75,8 @@ class ModuleInstance extends InstanceBase {
     this.sourceList = [];
     /** 选中的屏幕列表 */
     this.selectedScreenList = [];
+    /** Per-screen brightness hold-to-ramp interval handles (keyed by screenId) */
+    this.brightnessRampTimers = {};
     /** 选中的图层 */
     this.selectedLayerInfo = null;
     /** 定时器句柄 */
@@ -129,6 +132,59 @@ class ModuleInstance extends InstanceBase {
      * (Get Slot Information) responses when input signal polling is enabled.
      */
     this.inputSignalState = {};
+  }
+
+  /**
+   * Apply a single relative brightness step to a screen and push it to the
+   * device. Shared by the direct +/- actions and the hold-to-ramp timer.
+   * Returns the new brightness (0-100), or undefined if the screen is unknown.
+   */
+  stepBrightness(screenId, delta) {
+    const details = this.screenList?.find((s) => s.screenId === screenId)?.details;
+    if (!details) return undefined;
+    const brightness = Math.max(0, Math.min(100, (details.brightness ?? 100) + delta));
+    details.brightness = brightness;
+    this.updateEnhancedFromAction(screenId, 'brightness', brightness);
+    this.safeSend(handleParams(ACTIONS_CMD.apply_screen_brightness, { screenId, brightness }));
+    return brightness;
+  }
+
+  /**
+   * Start a hold-to-ramp on a screen's brightness. Fires one step immediately
+   * (so a quick tap still nets a single step) then keeps stepping every
+   * RAMP_MS until stopBrightnessRamp is called (button release), a 0/100
+   * boundary is hit, or a failsafe max duration elapses (in case the release
+   * event is ever missed). delta is +1 or -1.
+   */
+  startBrightnessRamp(screenId, delta) {
+    this.stopBrightnessRamp(screenId);
+    const RAMP_MS = 100; // step cadence while held (~10s across the full range)
+    const MAX_MS = 20000; // failsafe: never ramp longer than this without a release
+    let elapsed = 0;
+    const first = this.stepBrightness(screenId, delta);
+    if (first === undefined) return; // unknown screen, nothing to ramp
+    this.brightnessRampTimers[screenId] = setInterval(() => {
+      elapsed += RAMP_MS;
+      const v = this.stepBrightness(screenId, delta);
+      if (v === undefined || v <= 0 || v >= 100 || elapsed >= MAX_MS) this.stopBrightnessRamp(screenId);
+    }, RAMP_MS);
+  }
+
+  /** Stop a screen's brightness ramp (button release). */
+  stopBrightnessRamp(screenId) {
+    const timer = this.brightnessRampTimers?.[screenId];
+    if (timer) {
+      clearInterval(timer);
+      delete this.brightnessRampTimers[screenId];
+    }
+  }
+
+  /** Clear every active brightness ramp (used on destroy). */
+  stopAllBrightnessRamps() {
+    for (const key of Object.keys(this.brightnessRampTimers || {})) {
+      clearInterval(this.brightnessRampTimers[key]);
+    }
+    this.brightnessRampTimers = {};
   }
 
   /** Initialize per-screen enhanced state with defaults */
@@ -612,6 +668,7 @@ class ModuleInstance extends InstanceBase {
   // When module gets deleted
   async destroy() {
     this.log('info', 'destroy:' + this.id);
+    this.stopAllBrightnessRamps();
     if (this.udp !== undefined) {
       this.udp.destroy();
     }

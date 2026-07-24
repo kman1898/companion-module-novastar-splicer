@@ -146,12 +146,18 @@ const buildAllPresets = (instance) => {
   instance.screenList?.forEach((screen) => {
     const { name, screenId } = screen;
 
+    // Hold to ramp: press starts a continuous ramp (one immediate step so a
+    // quick tap still nudges 1%), release stops it. The module drives the
+    // repeat internally (Companion fires held groups once, not on a loop).
     presets[`direct_bright_up_${screenId}`] = {
       type: 'simple',
       name: `${name} Brightness +`,
       style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nBright +`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
       steps: [
-        { down: [{ actionId: 'brightness_add_direct', options: { screenId } }], up: [] },
+        {
+          down: [{ actionId: 'brightness_ramp_up', options: { screenId } }],
+          up: [{ actionId: 'brightness_ramp_stop', options: { screenId } }],
+        },
       ],
       feedbacks: [],
     };
@@ -161,7 +167,10 @@ const buildAllPresets = (instance) => {
       name: `${name} Brightness -`,
       style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nBright -`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
       steps: [
-        { down: [{ actionId: 'brightness_minus_direct', options: { screenId } }], up: [] },
+        {
+          down: [{ actionId: 'brightness_ramp_down', options: { screenId } }],
+          up: [{ actionId: 'brightness_ramp_stop', options: { screenId } }],
+        },
       ],
       feedbacks: [],
     };
