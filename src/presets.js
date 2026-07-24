@@ -67,7 +67,7 @@ const buildAllPresets = (instance) => {
           },
         ],
         steps: [
-          { down: [{ actionId: 'load_preset', options: { combineId, screenId } }], up: [] },
+          { down: [{ actionId: 'load_preset', options: { combineId } }], up: [] },
         ],
       };
     });
@@ -99,8 +99,8 @@ const buildAllPresets = (instance) => {
           },
         ],
         steps: [
-          { down: [{ actionId: 'select_layer', options: { combineId, screenId, enable: 1 } }], up: [] },
-          { down: [{ actionId: 'select_layer', options: { combineId, screenId, enable: 0 } }], up: [] },
+          { down: [{ actionId: 'select_layer', options: { combineId, enable: 1 } }], up: [] },
+          { down: [{ actionId: 'select_layer', options: { combineId, enable: 0 } }], up: [] },
         ],
       };
     });

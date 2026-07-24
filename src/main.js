@@ -313,8 +313,14 @@ class ModuleInstance extends InstanceBase {
     const inputCardCount = this.config.inputCardCount || 1;
     const PRESETS_PER_SCREEN = 20;
 
+    // Rebuild enhanced per-screen state too, so the screen_N_brightness /
+    // _frozen / _ftb / _bkg / _osd / _test_pattern variables exist offline
+    // (getEnhancedVariables iterates enhancedState.screens). Without this,
+    // offline mode has no screen brightness variable.
+    this.enhancedState = { screens: {} };
     this.screenList = [];
     for (let i = 0; i < screenCount; i++) {
+      this.initEnhancedScreen(i);
       this.screenList.push({
         screenId: i,
         name: `Screen ${i + 1}`,

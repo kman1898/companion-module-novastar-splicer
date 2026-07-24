@@ -50,12 +50,14 @@ export const getFeedbacks = (instance) => {
       type: 'boolean',
       name: 'Freeze Screen',
       description: 'Update button style when the selected screen is frozen.',
+      options: [],
       callback: () => instance.screenFRZState === 1,
     },
     layer_frz: {
       type: 'boolean',
       name: 'Freeze Layer',
       description: 'Update button style when the selected layer is frozen.',
+      options: [],
       callback: () => instance.layerFRZState === 1,
     },
     pgm_pvw_switch: {
@@ -87,6 +89,7 @@ export const getFeedbacks = (instance) => {
     pvw_take_selected: {
       type: 'boolean',
       name: 'Take Status Detection',
+      options: [],
       description: 'TUpdate button style when Take is selected.',
       callback: () => instance.pgmOrPvwActive.takeActive && instance.pgmOrPvwActive.pvwActive,
     },
@@ -125,18 +128,21 @@ export const getFeedbacks = (instance) => {
     ftb_selected: {
       type: 'boolean',
       name: 'FTB Status Detection',
+      options: [],
       description: 'Update button style on FTB status change.',
       callback: () => instance.ftb,
     },
     volume_switch_selected: {
       type: 'boolean',
       name: 'Volume On/Off Status Detection',
+      options: [],
       description: 'Update button style on volume status change.',
       callback: () => instance.volumeMute,
     },
     test_pattern_selected: {
       type: 'boolean',
       name: 'Test Pattern On/Off Status Detection',
+      options: [],
       description: 'Update button style on test pattern status change.',
       callback: () => instance.testPattern,
     },

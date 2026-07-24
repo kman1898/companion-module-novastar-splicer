@@ -365,6 +365,7 @@ export const getActions = (instance) => {
     },
     screen_volume_add: {
       name: 'Screen Volume Add',
+      options: [],
       description: 'Increase the volume of the selected screen.',
       callback: () => {
         instance.selectedScreenList?.forEach((screenId) => {
@@ -384,6 +385,7 @@ export const getActions = (instance) => {
     },
     screen_volume_minus: {
       name: 'Screen Volume Minus',
+      options: [],
       description: 'Decrease the volume of the selected screen.',
       callback: () => {
         instance.selectedScreenList?.forEach((screenId) => {
@@ -556,6 +558,7 @@ export const getActions = (instance) => {
     // ==================== End direct per-screen actions ====================
     screen_brightness_add: {
       name: 'Screen Brightness Add',
+      options: [],
       description: 'Increase the brightness of the screen loaded by the selected sending card.',
       callback: () => {
         instance.selectedScreenList?.forEach((screenId) => {
@@ -574,6 +577,7 @@ export const getActions = (instance) => {
     },
     screen_brightness_minus: {
       name: 'Screen Brightness Minus',
+      options: [],
       description: 'Decrease the brightness of the screen loaded by the selected sending card.',
       callback: () => {
         instance.selectedScreenList?.forEach((screenId) => {
