@@ -176,24 +176,53 @@ const buildAllPresets = (instance) => {
       feedbacks: [],
     };
 
-    // Graphical brightness bar readout: screen name + live brightness value,
-    // with the brightness_bar advanced feedback drawing a horizontal bar.
+    // Brightness bar readout as a LAYERED preset with a native `gauge` element
+    // (API 2.1 / Companion 5.0). This replaces the old advanced feedback that
+    // returned an imageBuffer, which Companion now marks deprecated. The gauge
+    // reads the live brightness variable via an expression, so it needs no
+    // feedback at all and stays resolution independent.
+    const brightnessVar = `$(${MODULE_NAME}:screen_${screenId + 1}_brightness)`;
     presets[`bright_bar_${screenId}`] = {
-      type: 'simple',
+      type: 'layered',
       name: `${name} Brightness Bar`,
-      style: {
-        text: `$(${MODULE_NAME}:screenId_${screenId})\n$(${MODULE_NAME}:screen_${screenId + 1}_brightness)%`,
-        size: 'auto',
-        color: combineRgb(255, 255, 255),
-        bgcolor: combineRgb(0, 0, 0),
-      },
-      steps: [{ down: [], up: [] }],
-      feedbacks: [
+      elements: [
         {
-          feedbackId: 'brightness_bar',
-          options: { screenId, barColor: combineRgb(0, 200, 0), barWidth: 8 },
+          id: 'brightness_gauge',
+          name: 'Brightness',
+          type: 'gauge',
+          x: 4,
+          y: 74,
+          width: 92,
+          height: 18,
+          min: 0,
+          max: 100,
+          value: { isExpression: true, value: brightnessVar },
+          orientation: 'horizontal',
+          fillEnabled: true,
+          roundedEnds: true,
+          trackStyle: 'dimmed',
+          stops: [{ value: 0, color: combineRgb(0, 200, 0), gradient: false }],
+        },
+        {
+          id: 'label',
+          name: 'Label',
+          type: 'text',
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 70,
+          text: {
+            isExpression: true,
+            value: `concat($(${MODULE_NAME}:screenId_${screenId}), "\\n", ${brightnessVar}, "%")`,
+          },
+          color: combineRgb(255, 255, 255),
+          halign: 'center',
+          valign: 'center',
+          fontsizeAllowShrink: true,
         },
       ],
+      steps: [{ down: [], up: [] }],
+      feedbacks: [],
     };
   });
 

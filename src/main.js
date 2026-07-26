@@ -235,11 +235,11 @@ class ModuleInstance extends InstanceBase {
     if (details.OsdImage?.enable !== undefined) s.osdImage = details.OsdImage.enable === 1;
 
     // Redraw any direct feedback whose underlying state changed on this poll.
-    // Without this the advanced brightness_bar (and the boolean direct
+    // Without this the boolean direct
     // feedbacks) only redraw on optimistic action updates, not when the
     // device reports a change made elsewhere (e.g. from the front panel).
     const changed = [];
-    if (before.brightness !== s.brightness) changed.push('brightness_match', 'brightness_bar');
+    if (before.brightness !== s.brightness) changed.push('brightness_match');
     if (before.frozen !== s.frozen) changed.push('frozen_direct');
     if (before.ftb !== s.ftb) changed.push('ftb_direct');
     if (before.bkg !== s.bkg) changed.push('bkg_direct');
@@ -255,7 +255,7 @@ class ModuleInstance extends InstanceBase {
     this.enhancedState.screens[screenId][property] = value;
     const prefix = `screen_${screenId + 1}`;
     const varMap = {
-      brightness: { key: `${prefix}_brightness`, val: value, feedbacks: ['brightness_match', 'brightness_bar'] },
+      brightness: { key: `${prefix}_brightness`, val: value, feedbacks: ['brightness_match'] },
       frozen: { key: `${prefix}_frozen`, val: value ? 'On' : 'Off', feedbacks: ['frozen_direct'] },
       ftb: { key: `${prefix}_ftb`, val: value ? 'On' : 'Off', feedbacks: ['ftb_direct'] },
       bkg: { key: `${prefix}_bkg`, val: value ? 'On' : 'Off', feedbacks: ['bkg_direct'] },
