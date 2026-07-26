@@ -37,7 +37,10 @@ export const getFeedbacks = (instance) => {
         },
       ],
       callback: (event) => {
-        const [screenId, layerId] = event.options.combineId.split('_').map((item) => Number(item));
+        // combineId defaults to null until the layer list has loaded (fresh
+        // connection, or a device with no screens), so guard before splitting.
+        if (!event.options.combineId) return false;
+        const [screenId, layerId] = String(event.options.combineId).split('_').map((item) => Number(item));
         return (
           instance.selectedLayerInfo &&
           instance.selectedLayerInfo.screenId === screenId &&
@@ -278,7 +281,9 @@ export const getFeedbacks = (instance) => {
         },
       ],
       callback: (event) => {
-        const [screenId, presetId] = event.options.combineId.split('_').map((item) => Number(item));
+        // combineId defaults to null until the preset list has loaded.
+        if (!event.options.combineId) return false;
+        const [screenId, presetId] = String(event.options.combineId).split('_').map((item) => Number(item));
         return (
           instance.selectedPresetInfo &&
           instance.selectedPresetInfo.screenId === screenId &&

@@ -20,7 +20,7 @@ const buildAllPresets = (instance) => {
       type: 'simple',
       name,
       style: {
-        text: `Select\\n$(${MODULE_NAME}:screenId_${screenId})`,
+        text: `Select\n$(${MODULE_NAME}:screenId_${screenId})`,
         size: '18',
         color: combineRgb(255, 255, 255),
         bgcolor: combineRgb(0, 0, 0),
@@ -298,7 +298,7 @@ const buildAllPresets = (instance) => {
       { down: [{ actionId: 'take_switch', options: { manualPlay: 0 } }], up: [] },
     ],
     feedbacks: [
-      { feedbackId: 'pvw_take_selected', style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+      { feedbackId: 'pvw_take_selected', options: {}, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
     ],
   };
 
@@ -311,7 +311,7 @@ const buildAllPresets = (instance) => {
       { down: [{ actionId: 'apply_ftb', options: { type: 1 } }], up: [] },
     ],
     feedbacks: [
-      { feedbackId: 'ftb_selected', style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0) } },
+      { feedbackId: 'ftb_selected', options: {}, style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0) } },
     ],
   };
 
@@ -324,7 +324,7 @@ const buildAllPresets = (instance) => {
       { down: [{ actionId: 'apply_volume_switch', options: { isMute: 1 } }], up: [] },
     ],
     feedbacks: [
-      { feedbackId: 'volume_switch_selected', style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+      { feedbackId: 'volume_switch_selected', options: {}, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
     ],
   };
 
@@ -337,7 +337,7 @@ const buildAllPresets = (instance) => {
       { down: [{ actionId: 'screen_frz_toggle', options: { enable: 0 } }], up: [] },
     ],
     feedbacks: [
-      { feedbackId: 'screen_frz', style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0) } },
+      { feedbackId: 'screen_frz', options: {}, style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0) } },
     ],
   };
 
@@ -350,7 +350,7 @@ const buildAllPresets = (instance) => {
       { down: [{ actionId: 'layer_frz_toggle', options: { enable: 0 } }], up: [] },
     ],
     feedbacks: [
-      { feedbackId: 'layer_frz', style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0) } },
+      { feedbackId: 'layer_frz', options: {}, style: { bgcolor: combineRgb(255, 0, 0), color: combineRgb(0, 0, 0) } },
     ],
   };
 
@@ -395,7 +395,7 @@ const buildAllPresets = (instance) => {
       { down: [{ actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.CLOSE } }], up: [] },
     ],
     feedbacks: [
-      { feedbackId: 'test_pattern_selected', style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+      { feedbackId: 'test_pattern_selected', options: {}, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
     ],
   };
 
@@ -408,7 +408,7 @@ const buildAllPresets = (instance) => {
       { down: [{ actionId: 'bkg_switch', options: { enable: 0 } }], up: [] },
     ],
     feedbacks: [
-      { feedbackId: 'bkg_switch', style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+      { feedbackId: 'bkg_switch', options: {}, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
     ],
   };
 
@@ -477,7 +477,7 @@ const buildAllPresets = (instance) => {
         { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'take_switch', options: { manualPlay: 0 } }], up: [] },
       ],
       feedbacks: [
-        { feedbackId: 'pvw_take_selected', style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+        { feedbackId: 'pvw_take_selected', options: {}, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
       ],
     };
 

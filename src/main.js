@@ -53,8 +53,16 @@ const DEFAULT_CONFIG = {
 function applyConfigDefaults(config) {
   const merged = { ...config };
   let filledMissing = false;
+  // Numeric fields where 0 is never a legal value — a stored 0 means the field
+  // was never populated (Companion does not backfill defaults onto an existing
+  // connection), so treat it as missing. Without this, Poll Interval shows 0 in
+  // the config UI even though the runtime falls back to 1000.
+  const zeroIsMissing = new Set(['pollInterval', 'screenCount', 'inputCardCount']);
   for (const [key, value] of Object.entries(DEFAULT_CONFIG)) {
-    if (merged[key] === undefined || merged[key] === null || merged[key] === '') {
+    const current = merged[key];
+    const missing =
+      current === undefined || current === null || current === '' || (zeroIsMissing.has(key) && Number(current) === 0);
+    if (missing) {
       merged[key] = value;
       filledMissing = true;
     }
@@ -140,12 +148,15 @@ class ModuleInstance extends InstanceBase {
    * Returns the new brightness (0-100), or undefined if the screen is unknown.
    */
   stepBrightness(screenId, delta) {
-    const details = this.screenList?.find((s) => s.screenId === screenId)?.details;
+    // Dropdown ids are numbers, but an imported/legacy button config can carry
+    // the id as a string; a strict === lookup would then silently match nothing.
+    const id = Number(screenId);
+    const details = this.screenList?.find((s) => s.screenId === id)?.details;
     if (!details) return undefined;
     const brightness = Math.max(0, Math.min(100, (details.brightness ?? 100) + delta));
     details.brightness = brightness;
-    this.updateEnhancedFromAction(screenId, 'brightness', brightness);
-    this.safeSend(handleParams(ACTIONS_CMD.apply_screen_brightness, { screenId, brightness }));
+    this.updateEnhancedFromAction(id, 'brightness', brightness);
+    this.safeSend(handleParams(ACTIONS_CMD.apply_screen_brightness, { screenId: id, brightness }));
     return brightness;
   }
 
@@ -158,25 +169,27 @@ class ModuleInstance extends InstanceBase {
    * +1 or -1.
    */
   startBrightnessRamp(screenId, delta, ms) {
-    this.stopBrightnessRamp(screenId);
+    const id = Number(screenId);
+    this.stopBrightnessRamp(id);
     const rampMs = Math.max(20, Math.min(2000, Number(ms) || 200));
     const MAX_MS = 30000; // failsafe: never ramp longer than this without a release
     let elapsed = 0;
-    const first = this.stepBrightness(screenId, delta);
+    const first = this.stepBrightness(id, delta);
     if (first === undefined) return; // unknown screen, nothing to ramp
-    this.brightnessRampTimers[screenId] = setInterval(() => {
+    this.brightnessRampTimers[id] = setInterval(() => {
       elapsed += rampMs;
-      const v = this.stepBrightness(screenId, delta);
-      if (v === undefined || v <= 0 || v >= 100 || elapsed >= MAX_MS) this.stopBrightnessRamp(screenId);
+      const v = this.stepBrightness(id, delta);
+      if (v === undefined || v <= 0 || v >= 100 || elapsed >= MAX_MS) this.stopBrightnessRamp(id);
     }, rampMs);
   }
 
   /** Stop a screen's brightness ramp (button release). */
   stopBrightnessRamp(screenId) {
-    const timer = this.brightnessRampTimers?.[screenId];
+    const id = Number(screenId);
+    const timer = this.brightnessRampTimers?.[id];
     if (timer) {
       clearInterval(timer);
-      delete this.brightnessRampTimers[screenId];
+      delete this.brightnessRampTimers[id];
     }
   }
 
@@ -736,6 +749,9 @@ class ModuleInstance extends InstanceBase {
 
     this.log('info', 'configUpdated module....');
 
+    // Any in-flight hold-to-ramp is tied to the old connection/screen list.
+    this.stopAllBrightnessRamps();
+
     this.config = normalized;
 
     // If offline mode is on and size changed, regenerate synthetic data
@@ -977,6 +993,13 @@ class ModuleInstance extends InstanceBase {
       };
     });
     this.screenList = merged;
+    // Seed enhanced state for any screen we have not seen yet, so the
+    // screen_N_* variables (and the brightness gauge that reads them) exist
+    // immediately instead of staying blank until the first R0401 arrives.
+    // updateEnhancedFromDetails overwrites these with device truth on that poll.
+    for (const screen of merged) {
+      if (!this.enhancedState.screens[screen.screenId]) this.initEnhancedScreen(screen.screenId);
+    }
     data.screens.forEach((screen) => {
       getLayerList(this, screen.screenId);
       getPresetList(this, screen.screenId);
@@ -1008,9 +1031,17 @@ class ModuleInstance extends InstanceBase {
   /** 处理屏幕详情 */
   dealScreenDetails(data) {
     if (this.screenList) {
-      this.screenList.find((screen) => screen.screenId === data.screenId).details = data;
+      const screen = this.screenList.find((s) => s.screenId === data.screenId);
+      if (!screen) return;
+      // While a hold-to-ramp is running on this screen we are the authority on
+      // brightness: the device's R0401 lags our W0410 writes, so accepting its
+      // value mid-ramp makes the level snap backwards (visible rubber-banding).
+      // Keep our in-flight value and let the device reconcile on release.
+      const ramping = !!this.brightnessRampTimers?.[data.screenId];
+      const localBrightness = screen.details?.brightness;
+      screen.details = ramping && localBrightness !== undefined ? { ...data, brightness: localBrightness } : data;
       // Reconcile enhanced per-screen state from the device truth
-      this.updateEnhancedFromDetails(data.screenId, data);
+      this.updateEnhancedFromDetails(data.screenId, screen.details);
     }
   }
 

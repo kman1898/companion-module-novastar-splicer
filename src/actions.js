@@ -46,7 +46,7 @@ export const getActions = (instance) => {
         if (enable === 0) {
           instance.selectedScreenList = instance.selectedScreenList.filter((item) => item !== screenId);
         }
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
       },
     },
     // 选择图层
@@ -83,7 +83,11 @@ export const getActions = (instance) => {
       ],
       callback: (event) => {
         const { enable } = event.options;
-        const [screenId, layerId] = event.options.combineId.split('_').map((item) => Number(item));
+        if (!event.options.combineId) {
+          instance.log('warn', 'select_layer: no layer selected (layer list not loaded yet)');
+          return;
+        }
+        const [screenId, layerId] = String(event.options.combineId).split('_').map((item) => Number(item));
         instance.log('debug', JSON.stringify(event.options));
         if (enable) {
           instance.selectedLayerInfo = { layerId, screenId };
@@ -91,7 +95,7 @@ export const getActions = (instance) => {
         if (enable === 0) {
           instance.selectedLayerInfo = null;
         }
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
       },
     },
     // 加载场景
@@ -111,9 +115,13 @@ export const getActions = (instance) => {
       callback: (event) => {
         const { combineId } = event.options;
         instance.log('debug', JSON.stringify(event.options));
-        const [screenId, presetId] = combineId.split('_').map((item) => Number(item));
+        if (!combineId) {
+          instance.log('warn', 'load_preset: no preset selected (preset list not loaded yet)');
+          return;
+        }
+        const [screenId, presetId] = String(combineId).split('_').map((item) => Number(item));
         instance.selectedPresetInfo = { screenId, presetId };
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
         const command = handleParams(ACTIONS_CMD.load_preset, {
           screenId,
           presetId,
@@ -163,7 +171,7 @@ export const getActions = (instance) => {
       callback: async (action) => {
         const { presetCollectionId } = action.options;
         instance.selectedPresetCollectionId = presetCollectionId;
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
         applyPresetCollection(instance, { presetCollectionId });
       },
     },
@@ -196,7 +204,7 @@ export const getActions = (instance) => {
           pvwActive: !isPgm,
           takeActive: false,
         };
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
         instance.selectedScreenList?.forEach((_screenId) => {
           applyPgmOrPvw(instance, {
             enNonTime,
@@ -232,7 +240,7 @@ export const getActions = (instance) => {
         if (!instance.pgmOrPvwActive.pvwActive) return;
         const { manualPlay } = action.options;
         instance.pgmOrPvwActive.takeActive = manualPlay === 1;
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
         instance.selectedScreenList?.forEach((_screenId) => {
           applyPgmOrPvw(instance, {
             enNonTime: 1,
@@ -267,7 +275,7 @@ export const getActions = (instance) => {
       callback: async (action) => {
         const { type } = action.options;
         instance.ftb = !type;
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
         if (!instance.selectedScreenList?.length) return;
         const param = instance.selectedScreenList.map((screenId) => ({ type, screenId }));
         blackScreen(instance, param);
@@ -298,7 +306,7 @@ export const getActions = (instance) => {
       callback: async (action) => {
         const { isMute } = action.options;
         instance.volumeMute = !isMute;
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
         if (!instance.selectedScreenList?.length) return;
         const resList = [];
         //音量批量下发只生效一个，所以需要遍历下发
@@ -352,7 +360,7 @@ export const getActions = (instance) => {
         const { enable } = action.options;
         instance.log('debug', enable);
         instance.screenFRZState = enable;
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
         if (instance.selectedScreenList.length === 0) {
           instance.log('error', 'Please select a screen');
           return;
@@ -652,7 +660,7 @@ export const getActions = (instance) => {
         const { enable } = action.options;
         instance.log('debug', action.options);
         instance.layerFRZState = enable;
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
         if (!instance.selectedLayerInfo) {
           instance.log('error', 'Please select a layer');
           return;
@@ -684,7 +692,7 @@ export const getActions = (instance) => {
         const { id } = action.options;
         const source = instance.sourceList?.find((_item) => id === `${_item.inputId}_${_item.cropId}`);
         instance.selectedSourceId = id;
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
         if (!source || !instance.selectedLayerInfo) return;
         instance.safeSend(
           handleParams(ACTIONS_CMD.source_switch, {
@@ -726,7 +734,7 @@ export const getActions = (instance) => {
       callback: async (action) => {
         const { testPattern } = action.options;
         instance.testPattern = testPattern === TEST_PATTERN_TYPE.OPEN;
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
         //目前的协议只支持遍历通过接口修改测试画面，后续协议支持按照屏幕修改后调整
         for (const screenId of instance.selectedScreenList) {
           const requests = [];
@@ -795,7 +803,7 @@ export const getActions = (instance) => {
       callback: (action) => {
         const { enable } = action.options;
         instance.bkgEnable = !!enable;
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
         if (!instance.selectedScreenList?.length) return;
         const requests = [];
         instance.selectedScreenList?.forEach((screenId) => {
@@ -866,7 +874,7 @@ export const getActions = (instance) => {
         } else {
           instance.textOsdEnable = !!enable;
         }
-        instance.checkFeedbacks();
+        instance.checkAllFeedbacks();
         if (!instance.selectedScreenList?.length) return;
         const requests = [];
         instance.selectedScreenList?.forEach((screenId) => {
