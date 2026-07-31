@@ -214,7 +214,12 @@ const buildAllPresets = (instance) => {
           orientation: 'horizontal',
           fillEnabled: true,
           roundedEnds: true,
+          // Set trackAmount explicitly: Companion defaults it to 70 when a
+          // preset is imported but to 30 when an element is added in the UI,
+          // so relying on the default gives two different looks.
           trackStyle: 'dimmed',
+          trackAmount: 30,
+          multiColour: false,
           stops: [{ value: 0, color: combineRgb(0, 200, 0), gradient: false }],
         },
         {
