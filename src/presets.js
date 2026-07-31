@@ -5,6 +5,11 @@ import { MODULE_NAME, PGM_PVW_TYPE, TEST_PATTERN_TYPE } from '../utils/constant.
 // preset builder and the structure builder so the two never drift.
 const BRIGHTNESS_LEVELS = [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0];
 
+// Default cadence for the hold-to-ramp brightness buttons, in milliseconds per
+// 1% step. This is emitted as an `internal:wait` Time value on the button, so
+// the operator can change it per button without touching the module.
+const BRIGHTNESS_RAMP_MS = 200;
+
 // ============================================================================
 // Screen-first preset layout with template groups
 // ============================================================================
@@ -146,20 +151,34 @@ const buildAllPresets = (instance) => {
   instance.screenList?.forEach((screen) => {
     const { name, screenId } = screen;
 
-    // Hold to ramp: press starts a continuous ramp (one immediate step so a
-    // quick tap still nudges 1%), release stops it. The ramp speed lives on the
-    // button itself (the ms option on the down action), so it is fully editable
-    // per button. Default 200 ms per 1% step.
+    // Hold to ramp, built from Companion's internal preset building blocks
+    // (API 2.1+). `internal:logicWhile` loops for as long as the button is
+    // still held (`internal:buttonPushed`), stepping brightness and then
+    // waiting. This needs no release action at all, and the step cadence is a
+    // plain `internal:wait` Time field on the button, so the operator can edit
+    // the ms in place. A quick tap runs one iteration, so it still nudges 1%.
+    const holdRampStep = (actionId) => ({
+      down: [
+        {
+          actionId: 'internal:logicWhile',
+          options: {},
+          children: {
+            condition: [{ feedbackId: 'internal:buttonPushed', options: {} }],
+            actions: [
+              { actionId, options: { screenId } },
+              { actionId: 'internal:wait', options: { time: BRIGHTNESS_RAMP_MS } },
+            ],
+          },
+        },
+      ],
+      up: [],
+    });
+
     presets[`direct_bright_up_${screenId}`] = {
       type: 'simple',
       name: `${name} Brightness +`,
       style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nBright +`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-      steps: [
-        {
-          down: [{ actionId: 'brightness_ramp_up', options: { screenId, ms: 200 } }],
-          up: [{ actionId: 'brightness_ramp_stop', options: { screenId } }],
-        },
-      ],
+      steps: [holdRampStep('brightness_add_direct')],
       feedbacks: [],
     };
 
@@ -167,12 +186,7 @@ const buildAllPresets = (instance) => {
       type: 'simple',
       name: `${name} Brightness -`,
       style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nBright -`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-      steps: [
-        {
-          down: [{ actionId: 'brightness_ramp_down', options: { screenId, ms: 200 } }],
-          up: [{ actionId: 'brightness_ramp_stop', options: { screenId } }],
-        },
-      ],
+      steps: [holdRampStep('brightness_minus_direct')],
       feedbacks: [],
     };
 
