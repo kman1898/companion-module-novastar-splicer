@@ -340,6 +340,26 @@ class ModuleInstance extends InstanceBase {
     }
     const interval = Math.max(500, Math.min(30000, Number(this.config.pollInterval) || 1000));
     this.dataInterval = setInterval(() => {
+      // Surface the "polling into the void" case: we keep transmitting on a
+      // timer whether or not the device ever answers, so without this the log
+      // shows a healthy-looking request stream while nothing comes back.
+      const rx = this.rxCount ?? 0;
+      if (rx === this.lastSeenRxCount) {
+        this.noReplyTicks = (this.noReplyTicks ?? 0) + 1;
+        // Warn once at ~5 ticks, then every ~30 ticks, so the log is not spammed.
+        if (this.noReplyTicks === 5 || this.noReplyTicks % 30 === 0) {
+          this.log(
+            'warn',
+            `No response from device at ${this.config.host}:${this.config.port} for ${this.noReplyTicks} poll cycles. ` +
+              `Check the IP/port, that the splicer is reachable, and that inbound UDP is not blocked by a firewall.`,
+          );
+          this.updateStatus(InstanceStatus.ConnectionFailure, 'No response from device');
+        }
+      } else if (this.noReplyTicks) {
+        this.log('info', 'Device responding again');
+        this.noReplyTicks = 0;
+      }
+      this.lastSeenRxCount = rx;
       this.getAllData();
     }, interval);
   }
@@ -704,6 +724,7 @@ class ModuleInstance extends InstanceBase {
       this.udp = new UDPHelper(this.config.host, this.config.port);
 
       this.udp.on('error', (err) => {
+        this.log('error', `UDP error: ${err?.message ?? err}`);
         this.updateStatus(InstanceStatus.ConnectionFailure);
       });
 
@@ -717,11 +738,19 @@ class ModuleInstance extends InstanceBase {
 
       // If we get data, thing should be good
       this.udp.on('data', (msg) => {
-        // this.log("info", JSON.stringify(decodeRes(msg)));
+        // Inbound packets were previously silent, which made "module transmits
+        // but nothing comes back" impossible to diagnose from the log: a
+        // response that decodes without an `ack` was dropped with no trace.
+        // Log receipt (and any drop) at debug so the log distinguishes
+        // "no reply from device" from "reply arrived but was discarded".
+        this.rxCount = (this.rxCount ?? 0) + 1;
         try {
           const res = decodeRes(msg);
           if (res.ack) {
+            this.log('debug', `UDP rx #${this.rxCount} cmd=${res.cmd ?? '?'} ack=${res.ack}`);
             this.UDPResponse(res);
+          } else {
+            this.log('debug', `UDP rx #${this.rxCount} DROPPED (no ack) cmd=${res?.cmd ?? '?'}`);
           }
         } catch (err) {
           this.log('error', `udp data error: ${err}`);
