@@ -196,7 +196,7 @@ const buildAllPresets = (instance) => {
     // reads the live brightness variable via an expression, so it needs no
     // feedback at all and stays resolution independent.
     const brightnessVar = `$(${MODULE_NAME}:screen_${screenId + 1}_brightness)`;
-    presets[`bright_bar_${screenId}`] = {
+    const brightBarLayered = {
       type: 'layered',
       name: `${name} Brightness Bar`,
       elements: [
@@ -242,6 +242,29 @@ const buildAllPresets = (instance) => {
       ],
       steps: [{ down: [], up: [] }],
       feedbacks: [],
+    };
+
+    // Ship the gauge with a plain-text fallback under `alternatives`. Companion
+    // renders the first variant it can; hosts that cannot draw layered buttons
+    // (e.g. Bitfocus Buttons) fall back to the simple one instead of losing the
+    // preset entirely. Both read the same brightness variable.
+    presets[`bright_bar_${screenId}`] = {
+      type: 'alternatives',
+      variants: [
+        brightBarLayered,
+        {
+          type: 'simple',
+          name: `${name} Brightness Bar`,
+          style: {
+            text: `$(${MODULE_NAME}:screenId_${screenId})\n${brightnessVar}%`,
+            size: 'auto',
+            color: combineRgb(255, 255, 255),
+            bgcolor: combineRgb(0, 0, 0),
+          },
+          steps: [{ down: [], up: [] }],
+          feedbacks: [],
+        },
+      ],
     };
   });
 
