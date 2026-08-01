@@ -203,14 +203,38 @@ const sourceLabel = ({ name, inputId, cropId, slotId, interfaceId }) => {
   return name && name !== where ? `${where}${crop} (${name})` : `${where}${crop}`;
 };
 
+/**
+ * Preferred variable id for a source: `input_<slot>_<connector>`, 1-based, so it
+ * lines up with the input signal variables (`input_1_1_signal`). Falls back to a
+ * 1-based input number when the device does not report slot/connector, and
+ * suffixes crop regions so they stay distinct.
+ */
+const sourceVariableId = ({ inputId, cropId, slotId, interfaceId }) => {
+  const base =
+    slotId !== undefined && interfaceId !== undefined
+      ? `input_${slotId + 1}_${interfaceId + 1}`
+      : `input_${inputId + 1}`;
+  return cropId === 255 || cropId === undefined ? base : `${base}_crop_${cropId + 1}`;
+};
+
 export const formatSourceVariable = (sourceList) => {
-  const sourceVariables =
-    sourceList?.map((item) => ({
-      // Keep the existing id so buttons built against it keep working.
-      variableId: `source_${item.inputId}_${item.cropId}`,
-      name: sourceLabel(item),
-      value: item.name,
-    })) || [];
+  const sourceVariables = [];
+  const seen = new Set();
+  for (const item of sourceList ?? []) {
+    // Friendly, signal-aligned id: $(H_Series:input_1_1) is the name of the
+    // source on slot 1 connector 1, alongside $(H_Series:input_1_1_signal).
+    const friendly = sourceVariableId(item);
+    if (!seen.has(friendly)) {
+      seen.add(friendly);
+      sourceVariables.push({ variableId: friendly, name: sourceLabel(item), value: item.name });
+    }
+    // Legacy id kept as an alias so buttons built against it keep working.
+    const legacy = `source_${item.inputId}_${item.cropId}`;
+    if (legacy !== friendly && !seen.has(legacy)) {
+      seen.add(legacy);
+      sourceVariables.push({ variableId: legacy, name: `${sourceLabel(item)} (legacy id)`, value: item.name });
+    }
+  }
   const sourceVariableObj = {};
   sourceVariables.forEach((variable) => {
     sourceVariableObj[variable.variableId] = variable.value;
