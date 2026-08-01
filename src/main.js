@@ -441,6 +441,19 @@ class ModuleInstance extends InstanceBase {
     // `inputId = slot * 4 + conn` gives a unique identifier across all cards;
     // formatSourceVariable builds `source_${inputId}_${cropId}` variable ids,
     // so duplicate inputIds would collide and only the last entry would show.
+    // Synthetic input-signal state so the input_signal feedback and the
+    // input_N_M_signal variables can be built and tested offline. Alternate
+    // signal/no-signal so both feedback states are visible without hardware.
+    // Only emitted when the polling toggle is on, matching live behaviour.
+    this.inputSignalState = {};
+    if (this.config.inputSignalPolling) {
+      for (let slot = 0; slot < inputCardCount; slot++) {
+        for (let conn = 0; conn < 4; conn++) {
+          this.inputSignalState[`input_${slot + 1}_${conn + 1}`] = (slot * 4 + conn) % 3 !== 2;
+        }
+      }
+    }
+
     this.sourceList = [];
     for (let slot = 0; slot < inputCardCount; slot++) {
       for (let conn = 0; conn < 4; conn++) {

@@ -187,12 +187,29 @@ export const formatPresetCollectionVariable = (presetCollectionList) => {
   };
 };
 
+/**
+ * Human label for a source. The device addresses inputs by slot + connector,
+ * so prefer "Input 2-3" when the source carries slotId/interfaceId, and fall
+ * back to a 1-based input number otherwise. cropId 255 means the whole source;
+ * any other value is a crop region of it.
+ */
+const sourceLabel = ({ name, inputId, cropId, slotId, interfaceId }) => {
+  const where =
+    slotId !== undefined && interfaceId !== undefined
+      ? `Input ${slotId + 1}-${interfaceId + 1}`
+      : `Input ${inputId + 1}`;
+  const crop = cropId === 255 || cropId === undefined ? '' : ` Crop ${cropId + 1}`;
+  // Include the device's own name when it adds something beyond the position.
+  return name && name !== where ? `${where}${crop} (${name})` : `${where}${crop}`;
+};
+
 export const formatSourceVariable = (sourceList) => {
   const sourceVariables =
-    sourceList?.map(({ name, inputId, cropId }) => ({
-      variableId: `source_${inputId}_${cropId}`,
-      name: `Source: ${inputId}_${cropId}`,
-      value: name,
+    sourceList?.map((item) => ({
+      // Keep the existing id so buttons built against it keep working.
+      variableId: `source_${item.inputId}_${item.cropId}`,
+      name: sourceLabel(item),
+      value: item.name,
     })) || [];
   const sourceVariableObj = {};
   sourceVariables.forEach((variable) => {

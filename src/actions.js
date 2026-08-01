@@ -276,7 +276,12 @@ export const getActions = (instance) => {
         const { type } = action.options;
         instance.ftb = !type;
         instance.checkAllFeedbacks();
-        if (!instance.selectedScreenList?.length) return;
+        if (!instance.selectedScreenList?.length) {
+          // These are the legacy "select screen first" actions. Silently doing
+          // nothing is indistinguishable from a broken device, so say so.
+          instance.log('warn', 'No screen selected. Use Select Screen first, or use the per-screen (Direct) action instead.');
+          return;
+        }
         const param = instance.selectedScreenList.map((screenId) => ({ type, screenId }));
         blackScreen(instance, param);
       },
@@ -307,7 +312,12 @@ export const getActions = (instance) => {
         const { isMute } = action.options;
         instance.volumeMute = !isMute;
         instance.checkAllFeedbacks();
-        if (!instance.selectedScreenList?.length) return;
+        if (!instance.selectedScreenList?.length) {
+          // These are the legacy "select screen first" actions. Silently doing
+          // nothing is indistinguishable from a broken device, so say so.
+          instance.log('warn', 'No screen selected. Use Select Screen first, or use the per-screen (Direct) action instead.');
+          return;
+        }
         const resList = [];
         //音量批量下发只生效一个，所以需要遍历下发
         const requests = [];
@@ -804,7 +814,12 @@ export const getActions = (instance) => {
         const { enable } = action.options;
         instance.bkgEnable = !!enable;
         instance.checkAllFeedbacks();
-        if (!instance.selectedScreenList?.length) return;
+        if (!instance.selectedScreenList?.length) {
+          // These are the legacy "select screen first" actions. Silently doing
+          // nothing is indistinguishable from a broken device, so say so.
+          instance.log('warn', 'No screen selected. Use Select Screen first, or use the per-screen (Direct) action instead.');
+          return;
+        }
         const requests = [];
         instance.selectedScreenList?.forEach((screenId) => {
           requests.push(
@@ -875,7 +890,12 @@ export const getActions = (instance) => {
           instance.textOsdEnable = !!enable;
         }
         instance.checkAllFeedbacks();
-        if (!instance.selectedScreenList?.length) return;
+        if (!instance.selectedScreenList?.length) {
+          // These are the legacy "select screen first" actions. Silently doing
+          // nothing is indistinguishable from a broken device, so say so.
+          instance.log('warn', 'No screen selected. Use Select Screen first, or use the per-screen (Direct) action instead.');
+          return;
+        }
         const requests = [];
         instance.selectedScreenList?.forEach((screenId) => {
           requests.push(
