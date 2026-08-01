@@ -650,48 +650,20 @@ const buildStructure = (instance) => {
     const { name, screenId } = screen;
     const groups = [];
 
-    // Select Screen (simple - only one button)
-    groups.push({
-      id: `screen_${screenId}_select`,
-      type: 'simple',
-      name: 'Select Screen',
-      keywords: ['select', 'screen'],
-      presets: [`screen_${screenId}`],
-    });
+    // Group order is deliberate and matches how operators reach for them during
+    // a show: brightness first (most used), then scene recall, then the
+    // per-screen controls, with selection/layers/test pattern further down.
 
-    // Preset Recall (one simple preset per scene — real names baked in)
-    const screenPresets = screen.presets || [];
-    if (screenPresets.length > 0) {
-      groups.push({
-        id: `screen_${screenId}_presets`,
-        type: 'simple',
-        name: 'Preset Recall',
-        keywords: ['preset', 'recall', 'scene', 'load'],
-        presets: screenPresets.map((p) => `preset_recall_${screenId}_${p.presetId}`),
-      });
-    }
-
-    // Layers (one simple preset per layer — real names baked in)
-    const screenLayers = screen.layers || [];
-    if (screenLayers.length > 0) {
-      groups.push({
-        id: `screen_${screenId}_layers`,
-        type: 'simple',
-        name: 'Layers',
-        keywords: ['layer', 'select'],
-        presets: screenLayers.map((l) => `layer_select_${screenId}_${l.layerId}`),
-      });
-    }
-
-    // Brightness levels (one simple preset per level — each shows its own %)
+    // 1. Brightness levels (one simple preset per level — each shows its own %)
     groups.push({
       id: `screen_${screenId}_brightness_levels`,
       type: 'simple',
-      name: 'Brightness Levels',
+      name: 'Brightness',
       keywords: ['brightness', 'dim', 'level', 'percent'],
       presets: BRIGHTNESS_LEVELS.map((pct) => `set_bright_${screenId}_${pct}`),
     });
 
+    // 2. Brightness Adjust
     groups.push({
       id: `screen_${screenId}_brightness_adjust`,
       type: 'simple',
@@ -704,7 +676,19 @@ const buildStructure = (instance) => {
       ],
     });
 
-    // Controls (simple - each is unique)
+    // 3. Preset Recall (one simple preset per scene — real names baked in)
+    const screenPresets = screen.presets || [];
+    if (screenPresets.length > 0) {
+      groups.push({
+        id: `screen_${screenId}_presets`,
+        type: 'simple',
+        name: 'Preset Recall',
+        keywords: ['preset', 'recall', 'scene', 'load'],
+        presets: screenPresets.map((p) => `preset_recall_${screenId}_${p.presetId}`),
+      });
+    }
+
+    // 4. Controls (simple - each is unique)
     groups.push({
       id: `screen_${screenId}_controls`,
       type: 'simple',
@@ -721,7 +705,28 @@ const buildStructure = (instance) => {
       ],
     });
 
-    // Test Pattern (simple - single button)
+    // 5. Select Screen (simple - only one button)
+    groups.push({
+      id: `screen_${screenId}_select`,
+      type: 'simple',
+      name: 'Select Screen',
+      keywords: ['select', 'screen'],
+      presets: [`screen_${screenId}`],
+    });
+
+    // 6. Layers (one simple preset per layer — real names baked in)
+    const screenLayers = screen.layers || [];
+    if (screenLayers.length > 0) {
+      groups.push({
+        id: `screen_${screenId}_layers`,
+        type: 'simple',
+        name: 'Layers',
+        keywords: ['layer', 'select'],
+        presets: screenLayers.map((l) => `layer_select_${screenId}_${l.layerId}`),
+      });
+    }
+
+    // 7. Test Pattern (simple - single button)
     groups.push({
       id: `screen_${screenId}_test_pattern`,
       type: 'simple',
