@@ -360,6 +360,11 @@ class ModuleInstance extends InstanceBase {
         this.noReplyTicks = 0;
       }
       this.lastSeenRxCount = rx;
+      // Flush whatever the last cycle's responses changed, once, at ping rate.
+      if (this.pendingUpdate) {
+        this.pendingUpdate = false;
+        this.updateAll();
+      }
       this.getAllData();
     }, interval);
   }
@@ -567,7 +572,16 @@ class ModuleInstance extends InstanceBase {
     for (const def of allVariableDefs) {
       if (def && def.variableId) variableDefsObject[def.variableId] = { name: def.name };
     }
-    this.setVariableDefinitions(variableDefsObject);
+    // Only (re)declare variables when the set of them actually changed. Pushing
+    // definitions makes Companion re-evaluate feedbacks, which visibly flashes
+    // every button showing an active feedback. bmd-videohub declares once in
+    // initThings() and thereafter only pushes values plus targeted
+    // checkFeedbacks(); this is the same split.
+    const defsKey = Object.keys(variableDefsObject).sort().join(',');
+    if (defsKey !== this.lastVariableDefsKey) {
+      this.lastVariableDefsKey = defsKey;
+      this.setVariableDefinitions(variableDefsObject);
+    }
     this.setVariableValues({
       ...screenDefaultVariableValues,
       ...layerDefaultVariableValues,
@@ -982,7 +996,11 @@ class ModuleInstance extends InstanceBase {
       default:
         break;
     }
-    this.updateAll();
+    // Do not push definitions/variables per packet. A poll cycle delivers well
+    // over a dozen responses, and pushing on each one floods Companion (which
+    // in 5.0 revalidates every preset per push). Mark dirty and flush once on
+    // the next poll tick instead, so updates land at the configured ping rate.
+    this.pendingUpdate = true;
   }
 
   /**

@@ -151,34 +151,20 @@ const buildAllPresets = (instance) => {
   instance.screenList?.forEach((screen) => {
     const { name, screenId } = screen;
 
-    // Hold to ramp, built from Companion's internal preset building blocks
-    // (API 2.1+). `internal:logicWhile` loops for as long as the button is
-    // still held (`internal:buttonPushed`), stepping brightness and then
-    // waiting. This needs no release action at all, and the step cadence is a
-    // plain `internal:wait` Time field on the button, so the operator can edit
-    // the ms in place. A quick tap runs one iteration, so it still nudges 1%.
+    // Hold to ramp: press starts a continuous ramp (one immediate step so a
+    // quick tap still nudges 1%), release stops it. The module drives the repeat
+    // internally with a timer. This replaced an internal:logicWhile version --
+    // that has no working precedent in any shipping module and did not run.
     const holdRampStep = (actionId) => ({
-      down: [
-        {
-          actionId: 'internal:logicWhile',
-          options: {},
-          children: {
-            condition: [{ feedbackId: 'internal:buttonPushed', options: {} }],
-            actions: [
-              { actionId, options: { screenId } },
-              { actionId: 'internal:wait', options: { time: BRIGHTNESS_RAMP_MS } },
-            ],
-          },
-        },
-      ],
-      up: [],
+      down: [{ actionId, options: { screenId, ms: BRIGHTNESS_RAMP_MS } }],
+      up: [{ actionId: 'brightness_ramp_stop', options: { screenId } }],
     });
 
     presets[`direct_bright_up_${screenId}`] = {
       type: 'simple',
       name: `${name} Brightness +`,
       style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nBright +`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-      steps: [holdRampStep('brightness_add_direct')],
+      steps: [holdRampStep('brightness_ramp_up')],
       feedbacks: [],
     };
 
@@ -186,7 +172,7 @@ const buildAllPresets = (instance) => {
       type: 'simple',
       name: `${name} Brightness -`,
       style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nBright -`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-      steps: [holdRampStep('brightness_minus_direct')],
+      steps: [holdRampStep('brightness_ramp_down')],
       feedbacks: [],
     };
 
