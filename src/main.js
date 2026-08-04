@@ -476,11 +476,59 @@ class ModuleInstance extends InstanceBase {
   }
 
   /** 更新actions、presets、feedbacks */
-  updateAll() {
+  /**
+   * Cheap signature of everything the action/feedback/preset definitions are
+   * built from. Definitions only need rebuilding when one of these changes;
+   * brightness and other live values do not affect them.
+   */
+  definitionSignature() {
+    const screens = (this.screenList ?? [])
+      .map(
+        (s) =>
+          `${s.screenId}:${s.name}:` +
+          `${(s.layers ?? []).map((l) => `${l.layerId}~${l.name}`).join(',')}:` +
+          `${(s.presets ?? []).map((p) => `${p.presetId}~${p.name}`).join(',')}`,
+      )
+      .join('|');
+    const groups = (this.presetCollectionList ?? []).map((g) => `${g.presetCollectionId}~${g.name}`).join(',');
+    const sources = (this.sourceList ?? [])
+      .map((s) => `${s.inputId}~${s.cropId}~${s.slotId}~${s.interfaceId}~${s.name}`)
+      .join(',');
+    // The polling flag itself matters: it gates the input_signal feedback and
+    // variables, so toggling it must rebuild even when no signals are known yet.
+    const polling = this.config?.inputSignalPolling ? '1' : '0';
+    const signals = this.config?.inputSignalPolling ? Object.keys(this.inputSignalState ?? {}).sort().join(',') : '';
+    return `${screens}#${groups}#${sources}#${polling}#${signals}`;
+  }
+
+  /**
+   * Rebuild definitions only when their inputs changed, then always refresh
+   * variable values.
+   *
+   * updateAll() runs at the end of every inbound UDP packet, which at a 1 s poll
+   * with several screens is well over a dozen times a second. Re-pushing every
+   * action, feedback and preset that often costs megabytes per second of IPC,
+   * and Companion 5.0 revalidates every preset on each push, which shows up as
+   * UI lag and a stuck "running" indicator on buttons. Values are cheap, so they
+   * still go every time.
+   */
+  updateAll(force = false) {
+    const signature = this.definitionSignature();
+    if (force || signature !== this.lastDefinitionSignature) {
+      this.lastDefinitionSignature = signature;
+      this.updateDefinitions();
+    }
+    this.updateVariables();
+  }
+
+  updateDefinitions() {
     this.setActionDefinitions(getActions(this));
     this.setFeedbackDefinitions(getFeedbacks(this));
     const { structure, presets } = getPresetDefinitions(this);
     this.setPresetDefinitions(structure, presets);
+  }
+
+  updateVariables() {
     // 处理变量
     const { screenVariableDefinitions, screenDefaultVariableValues } = formatScreenVariable(this.screenList);
     const { layerVariableDefinitions, layerDefaultVariableValues } = formatLayerVariable(this.screenList);
@@ -799,7 +847,7 @@ class ModuleInstance extends InstanceBase {
     // If offline mode is on and size changed, regenerate synthetic data
     if (sizeChanged && this.config.offlineMode) {
       this.generateOfflineData();
-      this.updateAll();
+      this.updateAll(true);
     }
 
     // Handle offline mode toggle
@@ -818,7 +866,7 @@ class ModuleInstance extends InstanceBase {
         this.clearInitStatusTimer();
         this.connectStatus = false;
         this.generateOfflineData();
-        this.updateAll();
+        this.updateAll(true);
         this.updateStatus(InstanceStatus.Ok, 'Offline Programming Mode');
         return;
       } else {
@@ -829,7 +877,7 @@ class ModuleInstance extends InstanceBase {
         this.presetCollectionList = [];
         this.sourceList = [];
         this.connectStatus = false;
-        this.updateAll();
+        this.updateAll(true);
         if (this.config.host) {
           this.updateStatus(InstanceStatus.Connecting);
           this.heartbeatManager.stop();
