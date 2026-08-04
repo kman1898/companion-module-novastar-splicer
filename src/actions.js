@@ -469,7 +469,7 @@ export const getActions = (instance) => {
       description: 'Hold to continuously increase brightness on a screen. Put on the button DOWN action; pair with Brightness Ramp Stop on the UP action.',
       options: [
         { type: 'dropdown', label: 'Screen', id: 'screenId', default: screenListDropDown[0]?.id ?? null, choices: screenListDropDown },
-        { type: 'number', label: 'Ramp speed (ms per 1% step)', id: 'ms', default: 200, min: 20, max: 2000, tooltip: 'Milliseconds between each 1% step while held. Lower = faster.' },
+        { type: 'number', label: 'Ramp speed (ms per 1% step, 0 = off)', id: 'ms', default: 200, min: 0, max: 2000, tooltip: 'Milliseconds between each 1% step while the button is held. Lower = faster. Set to 0 to turn repeat off, so each press steps exactly 1%.' },
       ],
       callback: (event) => instance.startBrightnessRamp(event.options.screenId, 1, event.options.ms),
     },
@@ -478,7 +478,7 @@ export const getActions = (instance) => {
       description: 'Hold to continuously decrease brightness on a screen. Put on the button DOWN action; pair with Brightness Ramp Stop on the UP action.',
       options: [
         { type: 'dropdown', label: 'Screen', id: 'screenId', default: screenListDropDown[0]?.id ?? null, choices: screenListDropDown },
-        { type: 'number', label: 'Ramp speed (ms per 1% step)', id: 'ms', default: 200, min: 20, max: 2000, tooltip: 'Milliseconds between each 1% step while held. Lower = faster.' },
+        { type: 'number', label: 'Ramp speed (ms per 1% step, 0 = off)', id: 'ms', default: 200, min: 0, max: 2000, tooltip: 'Milliseconds between each 1% step while the button is held. Lower = faster. Set to 0 to turn repeat off, so each press steps exactly 1%.' },
       ],
       callback: (event) => instance.startBrightnessRamp(event.options.screenId, -1, event.options.ms),
     },

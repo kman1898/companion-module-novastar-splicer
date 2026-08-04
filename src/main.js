@@ -171,11 +171,22 @@ class ModuleInstance extends InstanceBase {
   startBrightnessRamp(screenId, delta, ms) {
     const id = Number(screenId);
     this.stopBrightnessRamp(id);
-    const rampMs = Math.max(20, Math.min(2000, Number(ms) || 200));
-    const MAX_MS = 30000; // failsafe: never ramp longer than this without a release
-    let elapsed = 0;
+    // Note the explicit isFinite check: `Number(0) || 200` would be 200, since
+    // 0 is falsy, and 0 is exactly how the operator asks for repeat to be off.
+    const raw = Number(ms);
+    const requested = Number.isFinite(raw) ? raw : 200;
+
+    // Always take one step, so a press always moves 1% whether or not the
+    // button repeats.
     const first = this.stepBrightness(id, delta);
     if (first === undefined) return; // unknown screen, nothing to ramp
+
+    // Repeat off: single 1% increment per press, no hold behaviour at all.
+    if (requested <= 0) return;
+
+    const rampMs = Math.max(20, Math.min(2000, requested));
+    const MAX_MS = 30000; // failsafe: never ramp longer than this without a release
+    let elapsed = 0;
     this.brightnessRampTimers[id] = setInterval(() => {
       elapsed += rampMs;
       const v = this.stepBrightness(id, delta);
