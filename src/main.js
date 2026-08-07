@@ -1002,6 +1002,11 @@ class ModuleInstance extends InstanceBase {
       case ACTIONS_CMD.get_input_list_simplify:
         this.sourceList = formatSourceList(res.data.inputs);
         break;
+      case ACTIONS_CMD.get_output_list:
+        // Previously polled every cycle and discarded. It carries the output
+        // connector inventory, their device names, and live test pattern state.
+        this.dealOutputList(res.data);
+        break;
       case ACTIONS_CMD.device_heartbeat:
         this.heartbeatManager.receive();
         break;
@@ -1173,14 +1178,54 @@ class ModuleInstance extends InstanceBase {
   }
 
   /**
-   * Remember what pattern we last set on a connector. The protocol has no
-   * read-back for W0303 beyond R0301, so this is optimistic state used to light
-   * the per-connector feedback immediately on press.
+   * Optimistic write so the per-connector feedback lights the instant a button
+   * is pressed. The R0300 poll overwrites this with device truth shortly after.
    */
   setConnectorTestPattern(outputId, testPattern) {
     this.connectorTestPatterns = this.connectorTestPatterns ?? {};
     this.connectorTestPatterns[Number(outputId)] = Number(testPattern);
     this.checkFeedbacks('test_pattern_connector');
+  }
+
+  /**
+   * R0300 (Get Output List) response handler.
+   *
+   * Verified against a packet capture of the device's own web UI, which calls
+   * the equivalent `/api/output/readAllList` and gets back one entry per output
+   * connector carrying:
+   *   outputId, general.name ("output 35-1"), slotId, interfaceId,
+   *   interfaceType, isUsed, iSignal, and a testPattern object
+   *   { testPattern, bright, grid, speed }.
+   *
+   * This is a better connector inventory than harvesting screen details: it
+   * lists every connector (not just those assigned to a screen), carries the
+   * device's own name for each, and gives real test pattern read-back.
+   */
+  dealOutputList(data) {
+    const list = Array.isArray(data) ? data : (data?.outputs ?? data?.data ?? data?.outputList);
+    if (!Array.isArray(list)) return;
+    this.outputConnectors = this.outputConnectors ?? {};
+    this.connectorTestPatterns = this.connectorTestPatterns ?? {};
+    for (const out of list) {
+      const outputId = out?.outputId;
+      if (outputId === undefined || outputId === 255) continue;
+      const prev = this.outputConnectors[outputId] ?? {};
+      this.outputConnectors[outputId] = {
+        ...prev, // keep the mosaic cell worked out from the screen details
+        outputId,
+        // The device names connectors "output <slot>-<connector>", 1-based.
+        deviceName: out.general?.name ?? out.name ?? prev.deviceName,
+        slotId: out.slotId ?? prev.slotId,
+        interfaceId: out.interfaceId ?? prev.interfaceId,
+        interfaceType: out.interfaceType ?? prev.interfaceType,
+        isUsed: out.isUsed,
+        iSignal: out.iSignal,
+      };
+      // Device truth for the test pattern, so feedback reflects reality even
+      // when the pattern was set from the panel rather than from Companion.
+      const tp = out.testPattern?.testPattern;
+      if (tp !== undefined) this.connectorTestPatterns[outputId] = Number(tp);
+    }
   }
 
   /**
@@ -1222,7 +1267,10 @@ class ModuleInstance extends InstanceBase {
         if (row >= 1 && row <= rows && col >= 1 && col <= cols) cell = `R${row}C${col}`;
       }
 
+      // Merge, don't replace: R0300 supplies the device's own connector name
+      // and live test pattern state, and this handler must not wipe them.
       this.outputConnectors[outputId] = {
+        ...(this.outputConnectors[outputId] ?? {}),
         outputId,
         interfaceId: iface.interfaceId,
         slotId: iface.slotId,

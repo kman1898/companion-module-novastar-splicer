@@ -52,11 +52,23 @@ export default function formatDropDownData(instance) {
         (a.interfaceId ?? 0) - (b.interfaceId ?? 0),
     )
     .map((c) => {
-      const where = c.cell ? `${c.screenName} ${c.cell}` : c.screenName || `Output ${c.outputId}`;
-      const parts = [`Slot ${(c.slotId ?? 0) + 1}-${(c.interfaceId ?? 0) + 1}`];
+      // Lead with where it lands on the wall when we know it (screen + mosaic
+      // cell), otherwise with the device's own connector name.
+      const where = c.screenName
+        ? c.cell
+          ? `${c.screenName} ${c.cell}`
+          : c.screenName
+        : c.deviceName || `Output ${c.outputId}`;
+      // The device names connectors "output 35-1" already; prefer that over our
+      // own slot maths. Only repeat it in the detail when the lead is the screen,
+      // otherwise the label reads "output 21-1 (output 21-1 ...)".
+      const parts = [];
+      const connectorName = c.deviceName || `Slot ${(c.slotId ?? 0) + 1}-${(c.interfaceId ?? 0) + 1}`;
+      if (connectorName !== where) parts.push(connectorName);
       const type = INTERFACE_TYPES[c.interfaceType];
       if (type) parts.push(type);
       if (c.isCardOnline === 0) parts.push('offline');
+      else if (c.isUsed === 0 && !c.screenName) parts.push('unassigned');
       return { id: c.outputId, label: `${where} (${parts.join(' · ')})` };
     });
 
