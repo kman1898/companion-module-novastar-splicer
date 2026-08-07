@@ -1237,6 +1237,19 @@ class ModuleInstance extends InstanceBase {
       const tp = out.testPattern?.testPattern;
       if (tp !== undefined) this.connectorTestPatterns[outputId] = Number(tp);
     }
+
+    // Log the inventory whenever it changes. Slot and outputId numbering is
+    // chassis specific (an H2 and an H15 number their cards differently), and
+    // nothing here assumes a layout, so this is how you confirm what a given
+    // processor actually reported without guessing.
+    const summary = Object.values(this.outputConnectors)
+      .sort((a, b) => a.outputId - b.outputId)
+      .map((c) => `${c.outputId}=${c.deviceName ?? `slot${c.slotId}-${c.interfaceId}`}`)
+      .join(', ');
+    if (summary && summary !== this.lastOutputSummary) {
+      this.lastOutputSummary = summary;
+      this.log('info', `Output connectors discovered (outputId=name): ${summary}`);
+    }
   }
 
   /**
