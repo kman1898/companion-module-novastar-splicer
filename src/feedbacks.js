@@ -3,8 +3,14 @@ import { PGM_PVW_TYPE } from '../utils/constant.js';
 import formatDropDownData from '../utils/formatDropDown.js';
 
 export const getFeedbacks = (instance) => {
-  const { presetCollectionListDropDown, sourceListDropDown, presetDropDown, screenListDropDown, layerListDropDown } =
-    formatDropDownData(instance);
+  const {
+    presetCollectionListDropDown,
+    sourceListDropDown,
+    presetDropDown,
+    screenListDropDown,
+    layerListDropDown,
+    outputConnectorDropDown,
+  } = formatDropDownData(instance);
   return {
     screen_selected: {
       type: 'boolean',
@@ -185,6 +191,30 @@ export const getFeedbacks = (instance) => {
         } else {
           return instance.textOsdEnable;
         }
+      },
+    },
+    // Per-connector test pattern. Optimistic: reflects what this module last
+    // set on that connector, since W0303 has no direct read-back.
+    test_pattern_connector: {
+      type: 'boolean',
+      name: 'Test Pattern Active (Per Connector)',
+      description: 'True when a test pattern (any pattern other than Off) is set on the chosen output connector.',
+      defaultStyle: { bgcolor: combineRgb(255, 140, 0), color: combineRgb(0, 0, 0) },
+      options: [
+        {
+          type: 'dropdown',
+          label: 'Output Connector',
+          id: 'outputId',
+          default: outputConnectorDropDown[0]?.id ?? 0,
+          choices: outputConnectorDropDown.length
+            ? outputConnectorDropDown
+            : [{ id: 0, label: '(waiting for device data...)' }],
+          allowCustom: true,
+        },
+      ],
+      callback: (feedback) => {
+        const v = instance.connectorTestPatterns?.[Number(feedback.options.outputId)];
+        return v !== undefined && v !== 0xffff;
       },
     },
     // ==================== Direct per-screen feedbacks ====================

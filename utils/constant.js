@@ -105,3 +105,44 @@ export const TEST_PATTERN_TYPE = {
   CLOSE: 65535,
   OPEN: 0,
 };
+
+/**
+ * Output test patterns, per H Series Control Protocol V1.0.20 Appendix 5.3.
+ * Sent as `testPattern` in W0303 (4.7.1 Set Output Test Patterns), which is
+ * addressed by outputId - a physical output connector, not a screen.
+ */
+export const TEST_PATTERNS = [
+  { id: 0xffff, label: 'Off' },
+  // Row 1 of the device UI
+  { id: 0x0000, label: 'Black' },
+  { id: 0x0001, label: 'Red' },
+  { id: 0x0002, label: 'Green' },
+  { id: 0x0003, label: 'Blue' },
+  { id: 0x0004, label: 'White' },
+  { id: 0x0005, label: 'Colour Bars (Vertical)' },
+  // Row 2
+  { id: 0x0006, label: 'Colour Bars (Horizontal)' },
+  { id: 0x0007, label: 'Checkerboard' },
+  { id: 0x0100, label: 'Gradient: Red (Horizontal)' },
+  { id: 0x0101, label: 'Gradient: Green (Horizontal)' },
+  { id: 0x0102, label: 'Gradient: Blue (Horizontal)' },
+  { id: 0x0103, label: 'Gradient: White (Horizontal)' },
+  // Row 3
+  { id: 0x0104, label: 'Gradient: Red (Vertical)' },
+  { id: 0x0105, label: 'Gradient: Green (Vertical)' },
+  { id: 0x0106, label: 'Gradient: Blue (Vertical)' },
+  { id: 0x0107, label: 'Gradient: White (Vertical)' },
+  { id: 0x0200, label: 'Lines: Horizontal' },
+  { id: 0x0201, label: 'Lines: Vertical' },
+  // Row 4
+  { id: 0x0202, label: 'Lines: Diagonal Left' },
+  { id: 0x0203, label: 'Lines: Diagonal Right' },
+  { id: 0x0204, label: 'Grid: Cross' },
+  { id: 0x0205, label: 'Grid: Diagonal Cross' },
+  // Not shown in the H-series panel UI, but defined by the protocol. Kept so
+  // they are reachable; confirm on hardware before relying on them.
+  { id: 0x0300, label: 'Locate (protocol only)' },
+  { id: 0x0301, label: 'MLCD Test Pattern Rotation (protocol only)' },
+  { id: 0x0302, label: 'MLCD White 64 Grayscale (protocol only)' },
+  { id: 0xfffe, label: 'Custom Test Pattern (protocol only)' },
+];

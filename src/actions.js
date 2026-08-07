@@ -1,10 +1,16 @@
-import { ACTIONS_CMD, DEFAULT_COMMAND, TEST_PATTERN_TYPE } from '../utils/constant.js';
+import { ACTIONS_CMD, DEFAULT_COMMAND, TEST_PATTERN_TYPE, TEST_PATTERNS } from '../utils/constant.js';
 import formatDropDownData from '../utils/formatDropDown.js';
 import { handleParams, sendUDPRequestsSync } from '../utils/index.js';
 import { applyPgmOrPvw, applyPresetCollection, blackScreen } from '../utils/request.js';
 export const getActions = (instance) => {
-  const { presetCollectionListDropDown, sourceListDropDown, presetDropDown, screenListDropDown, layerListDropDown } =
-    formatDropDownData(instance);
+  const {
+    presetCollectionListDropDown,
+    sourceListDropDown,
+    presetDropDown,
+    screenListDropDown,
+    layerListDropDown,
+    outputConnectorDropDown,
+  } = formatDropDownData(instance);
   return {
     // 选择屏幕
     select_screen: {
@@ -717,6 +723,79 @@ export const getActions = (instance) => {
             layerId: instance.selectedLayerInfo.layerId,
           }),
         );
+      },
+    },
+    // ---- Per-connector test pattern (protocol V1.0.20 section 4.7.1) ----
+    // W0303 is addressed by outputId, i.e. one physical output connector. The
+    // older test_pattern_switch action fans the same pattern out across every
+    // connector of the selected screens; this one targets exactly one.
+    test_pattern_connector: {
+      name: 'Test Pattern (Per Connector)',
+      description:
+        'Set the test pattern on one physical output connector. Spacing/Speed/Brightness match the sliders on the device panel.',
+      options: [
+        {
+          type: 'dropdown',
+          label: 'Output Connector',
+          id: 'outputId',
+          default: outputConnectorDropDown[0]?.id ?? 0,
+          choices: outputConnectorDropDown.length
+            ? outputConnectorDropDown
+            : [{ id: 0, label: '(waiting for device data...)' }],
+          allowCustom: true,
+          tooltip: 'Discovered from the screen configuration. Only assigned connectors are listed.',
+        },
+        {
+          type: 'dropdown',
+          label: 'Pattern',
+          id: 'testPattern',
+          default: 0xffff,
+          choices: TEST_PATTERNS,
+        },
+        {
+          type: 'number',
+          label: 'Spacing',
+          id: 'grid',
+          default: 5,
+          min: 0,
+          max: 7,
+          tooltip: 'Grid/line density, 0-7. Shown as "Spacing" on the device panel. Only affects line and grid patterns.',
+        },
+        {
+          type: 'number',
+          label: 'Speed',
+          id: 'speed',
+          default: 3,
+          min: 0,
+          max: 3,
+          tooltip: 'Motion speed, 0-3. Only affects the moving line and grid patterns.',
+        },
+        {
+          type: 'number',
+          label: 'Brightness',
+          id: 'bright',
+          default: 3,
+          min: 0,
+          max: 3,
+          tooltip: 'Test pattern brightness, 0-3.',
+        },
+      ],
+      callback: async (event) => {
+        const outputId = Number(event.options.outputId);
+        if (!Number.isFinite(outputId)) {
+          instance.log('warn', 'Test Pattern (Per Connector): no output connector selected');
+          return;
+        }
+        const testPattern = Number(event.options.testPattern);
+        const payload = {
+          outputId,
+          testPattern,
+          bright: Math.max(0, Math.min(3, Number(event.options.bright) || 0)),
+          grid: Math.max(0, Math.min(7, Number(event.options.grid) || 0)),
+          speed: Math.max(0, Math.min(3, Number(event.options.speed) || 0)),
+        };
+        instance.setConnectorTestPattern(outputId, testPattern);
+        instance.safeSend(handleParams(ACTIONS_CMD.test_pattern_switch, payload));
       },
     },
     test_pattern_switch: {

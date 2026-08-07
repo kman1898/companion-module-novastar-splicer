@@ -36,11 +36,26 @@ export default function formatDropDownData(instance) {
     });
   });
 
+  // Output connectors, harvested from R0401 screen details. W0303 test patterns
+  // are addressed by outputId (a physical connector), not by screen, so this is
+  // the list an operator picks from. Sorted by slot then connector so the order
+  // matches the chassis. Labels are 1-based to match the panel.
+  const outputConnectorDropDown = Object.values(instance.outputConnectors ?? {})
+    .sort((a, b) => (a.slotId ?? 0) - (b.slotId ?? 0) || (a.interfaceId ?? 0) - (b.interfaceId ?? 0))
+    .map((c) => ({
+      id: c.outputId,
+      label:
+        `Slot ${(c.slotId ?? 0) + 1}-${(c.interfaceId ?? 0) + 1}` +
+        (c.screenName ? ` (${c.screenName})` : '') +
+        (c.isCardOnline === 0 ? ' [offline]' : ''),
+    }));
+
   return {
     presetCollectionListDropDown,
     sourceListDropDown,
     presetDropDown,
     screenListDropDown,
     layerListDropDown,
+    outputConnectorDropDown,
   };
 }

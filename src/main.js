@@ -140,6 +140,13 @@ class ModuleInstance extends InstanceBase {
      * (Get Slot Information) responses when input signal polling is enabled.
      */
     this.inputSignalState = {};
+    /**
+     * Physical output connectors, keyed by outputId, harvested from R0401
+     * screen details. W0303 test patterns are addressed per connector.
+     */
+    this.outputConnectors = {};
+    /** Last test pattern we set per outputId (optimistic; W0303 is write-only) */
+    this.connectorTestPatterns = {};
   }
 
   /**
@@ -1161,6 +1168,47 @@ class ModuleInstance extends InstanceBase {
       screen.details = ramping && localBrightness !== undefined ? { ...data, brightness: localBrightness } : data;
       // Reconcile enhanced per-screen state from the device truth
       this.updateEnhancedFromDetails(data.screenId, screen.details);
+      this.harvestOutputConnectors(screen);
+    }
+  }
+
+  /**
+   * Remember what pattern we last set on a connector. The protocol has no
+   * read-back for W0303 beyond R0301, so this is optimistic state used to light
+   * the per-connector feedback immediately on press.
+   */
+  setConnectorTestPattern(outputId, testPattern) {
+    this.connectorTestPatterns = this.connectorTestPatterns ?? {};
+    this.connectorTestPatterns[Number(outputId)] = Number(testPattern);
+    this.checkFeedbacks('test_pattern_connector');
+  }
+
+  /**
+   * Collect the physical output connectors this screen drives, from the R0401
+   * `outputMode.screenInterfaces` list. W0303 (Set Output Test Patterns) is
+   * addressed by `outputId`, i.e. a connector, not a screen -- so we need a
+   * connector inventory to offer per-connector test patterns.
+   *
+   * Per protocol V1.0.20 4.4.4, outputId 255 means "connector not assigned".
+   */
+  harvestOutputConnectors(screen) {
+    const interfaces = screen?.details?.outputMode?.screenInterfaces;
+    if (!Array.isArray(interfaces)) return;
+    this.outputConnectors = this.outputConnectors ?? {};
+    for (const iface of interfaces) {
+      const outputId = iface?.outputId;
+      if (outputId === undefined || outputId === 255) continue; // unassigned
+      this.outputConnectors[outputId] = {
+        outputId,
+        interfaceId: iface.interfaceId,
+        slotId: iface.slotId,
+        interfaceType: iface.interfaceType,
+        isCardOnline: iface.isCardOnline,
+        screenId: screen.screenId,
+        screenName: screen.name,
+        width: iface.resolution?.width ?? iface.width,
+        height: iface.resolution?.height ?? iface.height,
+      };
     }
   }
 
