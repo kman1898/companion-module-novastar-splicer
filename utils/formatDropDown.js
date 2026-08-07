@@ -1,3 +1,5 @@
+import { INTERFACE_TYPES } from './constant.js';
+
 export default function formatDropDownData(instance) {
   /** 场景下拉 */
   const presetDropDown = [];
@@ -37,18 +39,26 @@ export default function formatDropDownData(instance) {
   });
 
   // Output connectors, harvested from R0401 screen details. W0303 test patterns
-  // are addressed by outputId (a physical connector), not by screen, so this is
-  // the list an operator picks from. Sorted by slot then connector so the order
-  // matches the chassis. Labels are 1-based to match the panel.
+  // are addressed by outputId (a physical connector), not by screen. A screen is
+  // usually driven by SEVERAL connectors tiled across it, so the label leads with
+  // the screen and the connector's cell in the mosaic (R1C2 = row 1, column 2):
+  // that is what tells an operator which part of the wall they are about to
+  // flash. Slot/connector and the physical type follow, for finding it in a rack.
   const outputConnectorDropDown = Object.values(instance.outputConnectors ?? {})
-    .sort((a, b) => (a.slotId ?? 0) - (b.slotId ?? 0) || (a.interfaceId ?? 0) - (b.interfaceId ?? 0))
-    .map((c) => ({
-      id: c.outputId,
-      label:
-        `Slot ${(c.slotId ?? 0) + 1}-${(c.interfaceId ?? 0) + 1}` +
-        (c.screenName ? ` (${c.screenName})` : '') +
-        (c.isCardOnline === 0 ? ' [offline]' : ''),
-    }));
+    .sort(
+      (a, b) =>
+        (a.screenId ?? 0) - (b.screenId ?? 0) ||
+        (a.slotId ?? 0) - (b.slotId ?? 0) ||
+        (a.interfaceId ?? 0) - (b.interfaceId ?? 0),
+    )
+    .map((c) => {
+      const where = c.cell ? `${c.screenName} ${c.cell}` : c.screenName || `Output ${c.outputId}`;
+      const parts = [`Slot ${(c.slotId ?? 0) + 1}-${(c.interfaceId ?? 0) + 1}`];
+      const type = INTERFACE_TYPES[c.interfaceType];
+      if (type) parts.push(type);
+      if (c.isCardOnline === 0) parts.push('offline');
+      return { id: c.outputId, label: `${where} (${parts.join(' · ')})` };
+    });
 
   return {
     presetCollectionListDropDown,

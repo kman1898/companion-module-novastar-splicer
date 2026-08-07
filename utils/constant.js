@@ -111,6 +111,31 @@ export const TEST_PATTERN_TYPE = {
  * Sent as `testPattern` in W0303 (4.7.1 Set Output Test Patterns), which is
  * addressed by outputId - a physical output connector, not a screen.
  */
+/**
+ * Connector types, per protocol V1.0.20 section 4.3.3 ("interfaceType").
+ * Used to label physical output connectors in terms an operator recognises.
+ */
+export const INTERFACE_TYPES = {
+  1: 'EXP',
+  2: 'DVI',
+  3: 'DVI Dual',
+  4: 'HDMI 1.3',
+  5: 'HDMI 1.4',
+  6: 'HDMI 2.0',
+  7: 'DP 1.1',
+  8: 'DP 1.2',
+  9: '3G-SDI',
+  10: 'VGA',
+  11: 'CVBS',
+  12: 'YPbPr',
+  13: 'RJ45',
+  14: 'USB',
+  15: 'HDBaseT',
+  16: 'HDBaseT-4K',
+  17: 'Optical',
+  18: '12G-SDI',
+};
+
 export const TEST_PATTERNS = [
   { id: 0xffff, label: 'Off' },
   // Row 1 of the device UI

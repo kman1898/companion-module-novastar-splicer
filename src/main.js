@@ -1192,12 +1192,36 @@ class ModuleInstance extends InstanceBase {
    * Per protocol V1.0.20 4.4.4, outputId 255 means "connector not assigned".
    */
   harvestOutputConnectors(screen) {
-    const interfaces = screen?.details?.outputMode?.screenInterfaces;
+    const outputMode = screen?.details?.outputMode;
+    const interfaces = outputMode?.screenInterfaces;
     if (!Array.isArray(interfaces)) return;
     this.outputConnectors = this.outputConnectors ?? {};
+
+    // A screen is usually driven by several connectors tiled across it, so slot
+    // number alone does not tell an operator which part of the wall they are
+    // about to flash. Work out each connector's cell in the mosaic instead.
+    // Interface x/y share the screen's coordinate space, so subtract the
+    // screen origin to get the offset within the screen.
+    const mosaic = outputMode.mosaic ?? {};
+    const size = outputMode.size ?? {};
+    const rows = Number(mosaic.row) || 0;
+    const cols = Number(mosaic.column) || 0;
+    const cellW = cols > 0 && Number(size.width) ? Number(size.width) / cols : 0;
+    const cellH = rows > 0 && Number(size.height) ? Number(size.height) / rows : 0;
+
     for (const iface of interfaces) {
       const outputId = iface?.outputId;
       if (outputId === undefined || outputId === 255) continue; // unassigned
+
+      let cell;
+      if (cellW > 0 && cellH > 0 && (rows > 1 || cols > 1)) {
+        const relX = (Number(iface.x) || 0) - (Number(size.x) || 0);
+        const relY = (Number(iface.y) || 0) - (Number(size.y) || 0);
+        const col = Math.round(relX / cellW) + 1;
+        const row = Math.round(relY / cellH) + 1;
+        if (row >= 1 && row <= rows && col >= 1 && col <= cols) cell = `R${row}C${col}`;
+      }
+
       this.outputConnectors[outputId] = {
         outputId,
         interfaceId: iface.interfaceId,
@@ -1206,6 +1230,7 @@ class ModuleInstance extends InstanceBase {
         isCardOnline: iface.isCardOnline,
         screenId: screen.screenId,
         screenName: screen.name,
+        cell,
         width: iface.resolution?.width ?? iface.width,
         height: iface.resolution?.height ?? iface.height,
       };
