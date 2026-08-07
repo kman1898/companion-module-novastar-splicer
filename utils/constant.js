@@ -107,10 +107,11 @@ export const TEST_PATTERN_TYPE = {
 };
 
 /**
- * Output test patterns, per H Series Control Protocol V1.0.20 Appendix 5.3.
- * Sent as `testPattern` in W0303 (4.7.1 Set Output Test Patterns), which is
- * addressed by outputId - a physical output connector, not a screen.
+ * Card types, per protocol section 4.3.2 ("cardType").
+ * Sender cards are the ones driving LED panels; Output cards are monitor outs.
  */
+export const CARD_TYPES = { 0: 'Empty', 1: 'Input', 2: 'Output', 3: 'Sending', 4: 'MVR' };
+
 /**
  * Connector types, per protocol V1.0.20 section 4.3.3 ("interfaceType").
  * Used to label physical output connectors in terms an operator recognises.
@@ -136,6 +137,12 @@ export const INTERFACE_TYPES = {
   18: '12G-SDI',
 };
 
+/**
+ * Output test patterns, per H Series Control Protocol V1.0.20 Appendix 5.3 and
+ * verified against a packet capture of the device panel. Sent as `testPattern`
+ * in W0303 (4.7.1), addressed by outputId - a physical output/sending-card
+ * connector, not a screen.
+ */
 export const TEST_PATTERNS = [
   { id: 0xffff, label: 'Off' },
   // Row 1 of the device UI

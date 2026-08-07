@@ -798,6 +798,85 @@ export const getActions = (instance) => {
         instance.safeSend(handleParams(ACTIONS_CMD.test_pattern_switch, payload));
       },
     },
+    // ---- Test pattern across a whole screen, or every screen at once ----
+    // W0303 addresses one connector, so a screen-wide pattern means one command
+    // per connector. With the R0300 inventory we know exactly which connectors
+    // belong to which screen, so this fans out in one press -- useful for
+    // flashing a whole wall for alignment and killing it again just as fast.
+    test_pattern_screen: {
+      name: 'Test Pattern (Screen / All Screens)',
+      description:
+        'Set the same test pattern on every output connector of a screen, or of every screen at once. Sends one W0303 per connector.',
+      options: [
+        {
+          type: 'dropdown',
+          label: 'Target',
+          id: 'target',
+          default: 'all',
+          choices: [
+            { id: 'all', label: 'All Screens' },
+            { id: 'sending', label: 'All Sending Cards' },
+            ...screenListDropDown,
+          ],
+          tooltip:
+            'All Screens covers every connector assigned to a screen. All Sending Cards covers every connector on a card the device reports as a sending card, assigned or not.',
+        },
+        {
+          type: 'dropdown',
+          label: 'Pattern',
+          id: 'testPattern',
+          default: 0xffff,
+          choices: TEST_PATTERNS,
+        },
+        { type: 'number', label: 'Spacing', id: 'grid', default: 3, min: 0, max: 7,
+          tooltip: 'Grid/line density, 0-7. Shown as "Spacing" on the device panel.' },
+        { type: 'number', label: 'Speed', id: 'speed', default: 2, min: 0, max: 3,
+          tooltip: 'Motion speed, 0-3. Only affects the moving patterns.' },
+        { type: 'number', label: 'Brightness', id: 'bright', default: 2, min: 0, max: 3 },
+      ],
+      callback: async (event) => {
+        const target = event.options.target;
+        const testPattern = Number(event.options.testPattern);
+        const bright = Math.max(0, Math.min(3, Number(event.options.bright) || 0));
+        const grid = Math.max(0, Math.min(7, Number(event.options.grid) || 0));
+        const speed = Math.max(0, Math.min(3, Number(event.options.speed) || 0));
+
+        const all = Object.values(instance.outputConnectors ?? {});
+        const targets =
+          target === 'all'
+            ? all.filter((c) => c.screenId !== undefined)
+            : target === 'sending'
+              ? // cardType 3 = Sender, per protocol 4.3.2. These are the cards
+                // driving LED panels, as opposed to plain monitor outputs.
+                all.filter((c) => instance.slotCardTypes?.[c.slotId] === 3)
+              : all.filter((c) => c.screenId === Number(target));
+
+        if (!targets.length) {
+          instance.log(
+            'warn',
+            'Test Pattern (Screen): no output connectors known yet for that target. Wait for the device to report its screen configuration.',
+          );
+          return;
+        }
+
+        for (const c of targets) {
+          instance.setConnectorTestPattern(c.outputId, testPattern);
+          instance.safeSend(
+            handleParams(ACTIONS_CMD.test_pattern_switch, {
+              outputId: c.outputId,
+              testPattern,
+              bright,
+              grid,
+              speed,
+            }),
+          );
+        }
+        instance.log(
+          'debug',
+          `Test pattern ${testPattern} sent to ${targets.length} connector(s): ${targets.map((c) => c.outputId).join(', ')}`,
+        );
+      },
+    },
     test_pattern_switch: {
       name: 'Test Pattern',
       description: 'On/Off; turn on or turn off the test pattern for the selected screen.',

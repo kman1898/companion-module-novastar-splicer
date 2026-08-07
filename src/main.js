@@ -1056,6 +1056,17 @@ class ModuleInstance extends InstanceBase {
     const values = {};
     const seenKeys = new Set();
 
+    // Record the card type of every populated slot, not just input slots.
+    // Per protocol §4.3.2: 1=Input, 2=Output, 3=Sender, 4=MVR. Output
+    // connectors are addressed by outputId, which carries no card type, so
+    // this is how we tell a sending card apart from a plain output card.
+    this.slotCardTypes = this.slotCardTypes ?? {};
+    for (const slot of slotList) {
+      if (typeof slot?.slotId === 'number' && slot?.cardType !== undefined) {
+        this.slotCardTypes[slot.slotId] = slot.cardType;
+      }
+    }
+
     for (const slot of slotList) {
       // Only input card slots that are actually populated. Per protocol
       // §4.3.2: cardType=1 is "Input card slot" (the bay), status=1 is

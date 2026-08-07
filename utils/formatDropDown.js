@@ -1,4 +1,4 @@
-import { INTERFACE_TYPES } from './constant.js';
+import { CARD_TYPES, INTERFACE_TYPES } from './constant.js';
 
 export default function formatDropDownData(instance) {
   /** 场景下拉 */
@@ -65,6 +65,8 @@ export default function formatDropDownData(instance) {
       const parts = [];
       const connectorName = c.deviceName || `Slot ${(c.slotId ?? 0) + 1}-${(c.interfaceId ?? 0) + 1}`;
       if (connectorName !== where) parts.push(connectorName);
+      const card = CARD_TYPES[instance.slotCardTypes?.[c.slotId]];
+      if (card === 'Sending') parts.push('Sending');
       const type = INTERFACE_TYPES[c.interfaceType];
       if (type) parts.push(type);
       if (c.isCardOnline === 0) parts.push('offline');
