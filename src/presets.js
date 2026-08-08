@@ -1,5 +1,5 @@
 import { combineRgb } from '@companion-module/base';
-import { MODULE_NAME, PGM_PVW_TYPE, TEST_PATTERN_TYPE } from '../utils/constant.js';
+import { MODULE_NAME, PGM_PVW_TYPE, TEST_PATTERN_TYPE, TEST_PATTERNS } from '../utils/constant.js';
 
 // Fixed brightness levels (5% steps, 100→0). Shared between the per-level
 // preset builder and the structure builder so the two never drift.
@@ -9,6 +9,13 @@ const BRIGHTNESS_LEVELS = [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 
 // 1% step. This is emitted as an `internal:wait` Time value on the button, so
 // the operator can change it per button without touching the module.
 const BRIGHTNESS_RAMP_MS = 200;
+// The 22 patterns the device panel shows, in panel order (verified against a
+// packet capture of the panel). Excludes Off and the four protocol-only ones.
+const PANEL_TEST_PATTERNS = TEST_PATTERNS.filter(
+  (p) => p.id !== 0xffff && !p.label.includes('protocol only'),
+);
+const TEST_PATTERN_OFF = 0xffff;
+
 // Ready-made test patterns across every sending card. Each is a two-step
 // toggle: press once for the pattern, again for Off. These are the ones an
 // LED tech actually reaches for - uniformity, dead pixels, geometry.
@@ -650,6 +657,64 @@ const buildAllPresets = (instance) => {
     // every output of the screen, and defaults to White (a uniformity check)
     // rather than Black -- the legacy action's "on" value was 0x0000 = Black,
     // which is why the old button only ever toggled black and off.
+    // One button per pattern for this screen. Individual presets rather than a
+    // template group: a template can only substitute the numeric pattern id, so
+    // the button would read "4" instead of "White".
+    PANEL_TEST_PATTERNS.forEach((tp) => {
+      presets[`test_${screenId}_${tp.id}`] = {
+        type: 'simple',
+        name: `${name} Test: ${tp.label}`,
+        style: {
+          text: `$(${MODULE_NAME}:screenId_${screenId})\n${tp.label}`,
+          size: 'auto',
+          color: combineRgb(255, 255, 255),
+          bgcolor: combineRgb(0, 0, 0),
+        },
+        steps: [
+          { down: [{ actionId: 'test_pattern_screen', options: { target: screenId, testPattern: tp.id, grid: 3, speed: 2, bright: 2 } }], up: [] },
+          { down: [{ actionId: 'test_pattern_screen', options: { target: screenId, testPattern: TEST_PATTERN_OFF, grid: 3, speed: 2, bright: 2 } }], up: [] },
+        ],
+        feedbacks: [
+          { feedbackId: 'test_pattern_direct', options: { screenId }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+        ],
+      };
+    });
+
+    // Cycle button: one step per pattern, then a final Off step. Companion
+    // advances the step on release, so each press walks to the next pattern and
+    // the 23rd press clears it. Holding for a second clears it early.
+    presets[`test_cycle_${screenId}`] = {
+      type: 'simple',
+      name: `${name} Test Pattern Cycle`,
+      style: {
+        text: `$(${MODULE_NAME}:screenId_${screenId})\nTest\nCycle`,
+        size: 'auto',
+        color: combineRgb(255, 255, 255),
+        bgcolor: combineRgb(0, 0, 0),
+      },
+      options: { stepAutoProgress: true },
+      steps: [
+        ...PANEL_TEST_PATTERNS.map((tp) => ({
+          name: tp.label,
+          down: [{ actionId: 'test_pattern_screen', options: { target: screenId, testPattern: tp.id, grid: 3, speed: 2, bright: 2 } }],
+          up: [],
+          // Hold ~1s on any step to bail out and clear the pattern.
+          1000: {
+            options: { runWhileHeld: true },
+            actions: [{ actionId: 'test_pattern_screen', options: { target: screenId, testPattern: TEST_PATTERN_OFF, grid: 3, speed: 2, bright: 2 } }],
+          },
+        })),
+        {
+          name: 'Off',
+          down: [{ actionId: 'test_pattern_screen', options: { target: screenId, testPattern: TEST_PATTERN_OFF, grid: 3, speed: 2, bright: 2 } }],
+          up: [],
+        },
+      ],
+      feedbacks: [
+        { feedbackId: 'test_pattern_direct', options: { screenId }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+      ],
+    };
+
     presets[`direct_test_${screenId}`] = {
       type: 'simple',
       name: `${name} Test Pattern`,
@@ -794,6 +859,8 @@ const buildStructure = (instance) => {
       keywords: ['test', 'pattern', 'test pattern', 'grid'],
       presets: [
         `direct_test_${screenId}`,
+        `test_cycle_${screenId}`,
+        ...PANEL_TEST_PATTERNS.map((tp) => `test_${screenId}_${tp.id}`),
       ],
     });
 
