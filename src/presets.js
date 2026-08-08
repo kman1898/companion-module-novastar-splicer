@@ -9,11 +9,23 @@ const BRIGHTNESS_LEVELS = [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 
 // 1% step. This is emitted as an `internal:wait` Time value on the button, so
 // the operator can change it per button without touching the module.
 const BRIGHTNESS_RAMP_MS = 200;
+// Ready-made test patterns across every sending card. Each is a two-step
+// toggle: press once for the pattern, again for Off. These are the ones an
+// LED tech actually reaches for - uniformity, dead pixels, geometry.
+const GLOBAL_TEST_PATTERNS = [
+  { id: 'white', label: 'White', pattern: 0x0004, text: 'Test\nWhite' },
+  { id: 'black', label: 'Black', pattern: 0x0000, text: 'Test\nBlack' },
+  { id: 'red', label: 'Red', pattern: 0x0001, text: 'Test\nRed' },
+  { id: 'green', label: 'Green', pattern: 0x0002, text: 'Test\nGreen' },
+  { id: 'blue', label: 'Blue', pattern: 0x0003, text: 'Test\nBlue' },
+  { id: 'bars', label: 'Colour Bars', pattern: 0x0005, text: 'Test\nBars' },
+  { id: 'checker', label: 'Checkerboard', pattern: 0x0007, text: 'Test\nCheck' },
+  { id: 'grid', label: 'Grid', pattern: 0x0204, text: 'Test\nGrid' },
+];
 
-// ============================================================================
-// Screen-first preset layout with template groups
-// ============================================================================
 
+// =====================================================================// Screen-first preset layout with template groups
+// =====================================================================
 /** Build all preset definitions (flat map, keyed by unique ID) */
 const buildAllPresets = (instance) => {
   const presets = {};
@@ -461,13 +473,26 @@ const buildAllPresets = (instance) => {
     feedbacks: [],
   };
 
+  for (const tp of GLOBAL_TEST_PATTERNS) {
+    presets[`test_pattern_${tp.id}`] = {
+      type: 'simple',
+      name: `Test Pattern: ${tp.label} (All Sending Cards)`,
+      style: { text: tp.text, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+      steps: [
+        { down: [{ actionId: 'test_pattern_screen', options: { target: 'sending', testPattern: tp.pattern, grid: 3, speed: 2, bright: 2 } }], up: [] },
+        { down: [{ actionId: 'test_pattern_screen', options: { target: 'sending', testPattern: 0xffff, grid: 3, speed: 2, bright: 2 } }], up: [] },
+      ],
+      feedbacks: [],
+    };
+  }
+
   presets['test_pattern_global'] = {
     type: 'simple',
-    name: 'Test Pattern',
+    name: 'Test Pattern (All Sending Cards)',
     style: { text: 'Test\nPattern', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
     steps: [
-      { down: [{ actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.OPEN } }], up: [] },
-      { down: [{ actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.CLOSE } }], up: [] },
+      { down: [{ actionId: 'test_pattern_screen', options: { target: 'sending', testPattern: 0x0004, grid: 3, speed: 2, bright: 2 } }], up: [] },
+      { down: [{ actionId: 'test_pattern_screen', options: { target: 'sending', testPattern: 0xffff, grid: 3, speed: 2, bright: 2 } }], up: [] },
     ],
     feedbacks: [
       { feedbackId: 'test_pattern_selected', options: {}, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
@@ -621,13 +646,17 @@ const buildAllPresets = (instance) => {
       ],
     };
 
+    // Test pattern for this screen. Uses the connector-aware action so it hits
+    // every output of the screen, and defaults to White (a uniformity check)
+    // rather than Black -- the legacy action's "on" value was 0x0000 = Black,
+    // which is why the old button only ever toggled black and off.
     presets[`direct_test_${screenId}`] = {
       type: 'simple',
       name: `${name} Test Pattern`,
       style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nTest`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
       steps: [
-        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.OPEN } }], up: [] },
-        { down: [{ actionId: 'select_screen', options: { screenId, enable: 1 } }, { actionId: 'test_pattern_switch', options: { testPattern: TEST_PATTERN_TYPE.CLOSE } }], up: [] },
+        { down: [{ actionId: 'test_pattern_screen', options: { target: screenId, testPattern: 0x0004, grid: 3, speed: 2, bright: 2 } }], up: [] },
+        { down: [{ actionId: 'test_pattern_screen', options: { target: screenId, testPattern: 0xffff, grid: 3, speed: 2, bright: 2 } }], up: [] },
       ],
       feedbacks: [
         { feedbackId: 'test_pattern_direct', options: { screenId }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
@@ -670,10 +699,8 @@ const buildAllPresets = (instance) => {
   return presets;
 };
 
-// ============================================================================
-// STRUCTURE: Screen-first hierarchy with template groups
-// ============================================================================
-
+// =====================================================================// STRUCTURE: Screen-first hierarchy with template groups
+// =====================================================================
 const buildStructure = (instance) => {
   const structure = [];
   const screens = instance.screenList || [];
@@ -808,7 +835,7 @@ const buildStructure = (instance) => {
         type: 'simple',
         name: 'Test Pattern',
         keywords: ['test', 'pattern', 'grid'],
-        presets: ['test_pattern_global'],
+        presets: ['test_pattern_global', ...GLOBAL_TEST_PATTERNS.map((t) => `test_pattern_${t.id}`)],
       },
       {
         id: 'global_volume',
@@ -874,10 +901,8 @@ const buildStructure = (instance) => {
   return structure;
 };
 
-// ============================================================================
-// EXPORT
-// ============================================================================
-
+// =====================================================================// EXPORT
+// =====================================================================
 export const getPresetDefinitions = function (instance) {
   const presets = buildAllPresets(instance);
   const structure = buildStructure(instance);
