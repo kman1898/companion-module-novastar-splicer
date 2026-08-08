@@ -16,6 +16,43 @@ const PANEL_TEST_PATTERNS = TEST_PATTERNS.filter(
 );
 const TEST_PATTERN_OFF = 0xffff;
 
+// Give each test pattern button a face that looks like the pattern it fires.
+// Solid colours use the colour itself, gradients a darker shade, the line and
+// grid patterns a neutral dark, colour bars a mixed hue.
+const TEST_PATTERN_COLORS = {
+  0x0000: [0, 0, 0], // Black
+  0x0001: [200, 0, 0], // Red
+  0x0002: [0, 170, 0], // Green
+  0x0003: [0, 70, 220], // Blue
+  0x0004: [255, 255, 255], // White
+  0x0005: [140, 90, 190], // Colour bars (vertical)
+  0x0006: [140, 90, 190], // Colour bars (horizontal)
+  0x0007: [120, 120, 120], // Checkerboard
+  0x0100: [110, 0, 0], // Gradient red (horizontal)
+  0x0101: [0, 95, 0], // Gradient green (horizontal)
+  0x0102: [0, 40, 130], // Gradient blue (horizontal)
+  0x0103: [170, 170, 170], // Gradient white (horizontal)
+  0x0104: [110, 0, 0], // Gradient red (vertical)
+  0x0105: [0, 95, 0], // Gradient green (vertical)
+  0x0106: [0, 40, 130], // Gradient blue (vertical)
+  0x0107: [170, 170, 170], // Gradient white (vertical)
+  0x0200: [70, 70, 70], // Lines horizontal
+  0x0201: [70, 70, 70], // Lines vertical
+  0x0202: [70, 70, 70], // Diagonal left
+  0x0203: [70, 70, 70], // Diagonal right
+  0x0204: [90, 90, 60], // Grid cross
+  0x0205: [90, 90, 60], // Grid diagonal cross
+  0xffff: [0, 0, 0], // Off
+};
+
+/** Button face for a pattern, with text colour chosen for contrast. */
+const testPatternStyle = (patternId) => {
+  const [r, g, b] = TEST_PATTERN_COLORS[patternId] ?? [40, 40, 40];
+  // Rec. 601 luma: light faces get black text, dark faces white.
+  const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+  return { bgcolor: combineRgb(r, g, b), color: luma > 140 ? combineRgb(0, 0, 0) : combineRgb(255, 255, 255) };
+};
+
 // Ready-made test patterns across every sending card. Each is a two-step
 // toggle: press once for the pattern, again for Off. These are the ones an
 // LED tech actually reaches for - uniformity, dead pixels, geometry.
@@ -484,7 +521,7 @@ const buildAllPresets = (instance) => {
     presets[`test_pattern_${tp.id}`] = {
       type: 'simple',
       name: `Test Pattern: ${tp.label} (All Sending Cards)`,
-      style: { text: tp.text, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+      style: { text: tp.text, size: 'auto', ...testPatternStyle(tp.pattern) },
       steps: [
         { down: [{ actionId: 'test_pattern_screen', options: { target: 'sending', testPattern: tp.pattern, grid: 3, speed: 2, bright: 2 } }], up: [] },
         { down: [{ actionId: 'test_pattern_screen', options: { target: 'sending', testPattern: 0xffff, grid: 3, speed: 2, bright: 2 } }], up: [] },
@@ -667,8 +704,7 @@ const buildAllPresets = (instance) => {
         style: {
           text: `$(${MODULE_NAME}:screenId_${screenId})\n${tp.label}`,
           size: 'auto',
-          color: combineRgb(255, 255, 255),
-          bgcolor: combineRgb(0, 0, 0),
+          ...testPatternStyle(tp.id),
         },
         steps: [
           { down: [{ actionId: 'test_pattern_screen', options: { target: screenId, testPattern: tp.id, grid: 3, speed: 2, bright: 2 } }], up: [] },
