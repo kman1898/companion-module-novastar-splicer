@@ -530,19 +530,6 @@ const buildAllPresets = (instance) => {
     };
   }
 
-  presets['test_pattern_global'] = {
-    type: 'simple',
-    name: 'Test Pattern (All Sending Cards)',
-    style: { text: 'Test\nPattern', size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-    steps: [
-      { down: [{ actionId: 'test_pattern_screen', options: { target: 'sending', testPattern: 0x0004, grid: 3, speed: 2, bright: 2 } }], up: [] },
-      { down: [{ actionId: 'test_pattern_screen', options: { target: 'sending', testPattern: 0xffff, grid: 3, speed: 2, bright: 2 } }], up: [] },
-    ],
-    feedbacks: [
-      { feedbackId: 'test_pattern_selected', options: {}, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
-    ],
-  };
-
   presets['bkg_global'] = {
     type: 'simple',
     name: 'BKG',
@@ -690,13 +677,10 @@ const buildAllPresets = (instance) => {
       ],
     };
 
-    // Test pattern for this screen. Uses the connector-aware action so it hits
-    // every output of the screen, and defaults to White (a uniformity check)
-    // rather than Black -- the legacy action's "on" value was 0x0000 = Black,
-    // which is why the old button only ever toggled black and off.
-    // One button per pattern for this screen. Individual presets rather than a
-    // template group: a template can only substitute the numeric pattern id, so
-    // the button would read "4" instead of "White".
+    // One button per pattern for this screen, each hitting every connector the
+    // screen drives. Individual presets rather than a template group: a template
+    // can only substitute the numeric pattern id, so the button would read "4"
+    // instead of "White".
     PANEL_TEST_PATTERNS.forEach((tp) => {
       presets[`test_${screenId}_${tp.id}`] = {
         type: 'simple',
@@ -751,18 +735,6 @@ const buildAllPresets = (instance) => {
       ],
     };
 
-    presets[`direct_test_${screenId}`] = {
-      type: 'simple',
-      name: `${name} Test Pattern`,
-      style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nTest`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-      steps: [
-        { down: [{ actionId: 'test_pattern_screen', options: { target: screenId, testPattern: 0x0004, grid: 3, speed: 2, bright: 2 } }], up: [] },
-        { down: [{ actionId: 'test_pattern_screen', options: { target: screenId, testPattern: 0xffff, grid: 3, speed: 2, bright: 2 } }], up: [] },
-      ],
-      feedbacks: [
-        { feedbackId: 'test_pattern_direct', options: { screenId }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
-      ],
-    };
   });
 
   // ---- Input Signal status presets (one per real connector) ----
@@ -894,7 +866,6 @@ const buildStructure = (instance) => {
       name: 'Test Pattern',
       keywords: ['test', 'pattern', 'test pattern', 'grid'],
       presets: [
-        `direct_test_${screenId}`,
         `test_cycle_${screenId}`,
         ...PANEL_TEST_PATTERNS.map((tp) => `test_${screenId}_${tp.id}`),
       ],
@@ -938,7 +909,7 @@ const buildStructure = (instance) => {
         type: 'simple',
         name: 'Test Pattern',
         keywords: ['test', 'pattern', 'grid'],
-        presets: ['test_pattern_global', ...GLOBAL_TEST_PATTERNS.map((t) => `test_pattern_${t.id}`)],
+        presets: GLOBAL_TEST_PATTERNS.map((t) => `test_pattern_${t.id}`),
       },
       {
         id: 'global_volume',
