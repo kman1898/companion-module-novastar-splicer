@@ -1061,9 +1061,19 @@ class ModuleInstance extends InstanceBase {
     // connectors are addressed by outputId, which carries no card type, so
     // this is how we tell a sending card apart from a plain output card.
     this.slotCardTypes = this.slotCardTypes ?? {};
+    // Also record which connectors physically exist on each card. R0300 reports
+    // a fixed grid of potential outputs per slot (4 per card on an H15), most of
+    // which are not real -- an 8-connector chassis still reports 32. R0100's
+    // interfaces[] is the actual inventory, so it is what we filter against.
+    this.slotInterfaces = {};
     for (const slot of slotList) {
       if (typeof slot?.slotId === 'number' && slot?.cardType !== undefined) {
         this.slotCardTypes[slot.slotId] = slot.cardType;
+        if (Array.isArray(slot.interfaces)) {
+          this.slotInterfaces[slot.slotId] = new Set(
+            slot.interfaces.map((i) => i?.interfaceId).filter((i) => typeof i === 'number'),
+          );
+        }
       }
     }
 
@@ -1236,6 +1246,18 @@ class ModuleInstance extends InstanceBase {
       // when the pattern was set from the panel rather than from Companion.
       const tp = out.testPattern?.testPattern;
       if (tp !== undefined) this.connectorTestPatterns[outputId] = Number(tp);
+    }
+
+    // R0300 reports a fixed grid of potential connectors per card (4 per slot on
+    // an H15), so a chassis with 8 physical outputs still lists 32. Drop the
+    // ones R0100 says do not exist, so "All Sending Cards" and the connector
+    // picker only ever offer real hardware. If R0100 has not arrived yet, keep
+    // everything rather than hiding connectors that do exist.
+    if (Object.keys(this.slotInterfaces ?? {}).length > 0) {
+      for (const [key, c] of Object.entries(this.outputConnectors)) {
+        const real = this.slotInterfaces[c.slotId];
+        if (real && !real.has(c.interfaceId)) delete this.outputConnectors[key];
+      }
     }
 
     // Log the inventory whenever it changes. Slot and outputId numbering is
