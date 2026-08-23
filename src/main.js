@@ -1,6 +1,6 @@
 import { InstanceBase, InstanceStatus, Regex, UDPHelper } from '@companion-module/base';
 
-import { ACTIONS_CMD, PRODUCTS_INFORMATION } from '../utils/constant.js';
+import { ACTIONS_CMD, PRODUCTS_INFORMATION, TEST_PATTERNS } from '../utils/constant.js';
 import { UpgradeScripts } from './upgrades.js';
 
 import { EventEmitter } from 'events';
@@ -292,10 +292,17 @@ class ModuleInstance extends InstanceBase {
       bkg: { key: `${prefix}_bkg`, val: value ? 'On' : 'Off', feedbacks: ['bkg_direct'] },
       osdText: { key: `${prefix}_osd_text`, val: value ? 'On' : 'Off', feedbacks: ['osd_text_direct'] },
       osdImage: { key: `${prefix}_osd_image`, val: value ? 'On' : 'Off', feedbacks: ['osd_image_direct'] },
-      testPattern: { key: `${prefix}_test_pattern`, val: value ? 'On' : 'Off', feedbacks: ['test_pattern_direct'] },
+      // The legacy action only knows on/off, but the name variable exists now and
+      // would otherwise keep reporting a stale pattern after a legacy toggle.
+      testPattern: {
+        key: `${prefix}_test_pattern`,
+        val: value ? 'On' : 'Off',
+        also: { [`${prefix}_test_pattern_name`]: value ? 'On' : 'Off' },
+        feedbacks: ['test_pattern_direct', 'test_pattern_is'],
+      },
     };
     if (varMap[property]) {
-      this.setVariableValues({ [varMap[property].key]: varMap[property].val });
+      this.setVariableValues({ [varMap[property].key]: varMap[property].val, ...(varMap[property].also ?? {}) });
       this.checkFeedbacks(...varMap[property].feedbacks);
     }
   }
@@ -318,6 +325,7 @@ class ModuleInstance extends InstanceBase {
         { variableId: `${prefix}_osd_text`, name: `${screenName} OSD Text` },
         { variableId: `${prefix}_osd_image`, name: `${screenName} OSD Image` },
         { variableId: `${prefix}_test_pattern`, name: `${screenName} Test Pattern` },
+        { variableId: `${prefix}_test_pattern_name`, name: `${screenName} Test Pattern Name` },
       );
       values[`${prefix}_brightness`] = state.brightness;
       values[`${prefix}_frozen`] = state.frozen ? 'On' : 'Off';
@@ -327,7 +335,19 @@ class ModuleInstance extends InstanceBase {
       values[`${prefix}_bkg_id`] = (state.bkgId ?? 0) + 1;
       values[`${prefix}_osd_text`] = state.osdText ? 'On' : 'Off';
       values[`${prefix}_osd_image`] = state.osdImage ? 'On' : 'Off';
-      values[`${prefix}_test_pattern`] = state.testPattern ? 'On' : 'Off';
+      // Test pattern state comes from the output connectors, not enhancedState:
+      // W0303 is addressed per connector, so the connector-aware actions track
+      // it in connectorTestPatterns. enhancedState.testPattern is only written
+      // by the legacy per-screen action, which is why this variable used to sit
+      // at "Off" while the cycle button was clearly working.
+      const screenConnectors = Object.values(this.outputConnectors ?? {}).filter((c) => c.screenId === screenId);
+      const livePattern = screenConnectors
+        .map((c) => this.connectorTestPatterns?.[c.outputId])
+        .find((v) => v !== undefined && v !== 0xffff);
+      const legacyOn = !!state.testPattern;
+      values[`${prefix}_test_pattern`] = livePattern !== undefined || legacyOn ? 'On' : 'Off';
+      values[`${prefix}_test_pattern_name`] =
+        livePattern !== undefined ? (TEST_PATTERNS.find((p) => p.id === livePattern)?.label ?? `0x${livePattern.toString(16)}`) : 'Off';
     }
     return { definitions, values };
   }
@@ -1230,7 +1250,11 @@ class ModuleInstance extends InstanceBase {
   setConnectorTestPattern(outputId, testPattern) {
     this.connectorTestPatterns = this.connectorTestPatterns ?? {};
     this.connectorTestPatterns[Number(outputId)] = Number(testPattern);
-    this.checkFeedbacks('test_pattern_connector');
+    // Push variables straight away rather than waiting for the next poll tick:
+    // in offline mode there is no poll at all, so the test pattern variables
+    // would otherwise never move.
+    this.updateVariables();
+    this.checkFeedbacks('test_pattern_connector', 'test_pattern_is');
   }
 
   /**

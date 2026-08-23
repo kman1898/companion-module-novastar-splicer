@@ -394,7 +394,10 @@ export const getActions = (instance) => {
       callback: () => {
         instance.selectedScreenList?.forEach((screenId) => {
           const curScreenDetails = instance.screenList.find((screen) => screen.screenId === screenId)?.details;
-          if (!curScreenDetails) return;
+          // Guard audio separately: not every screen reports an audio block, and
+          // an unguarded read here throws, which aborts every later action on
+          // the same button rather than just skipping this one.
+          if (!curScreenDetails?.audio) return;
           let volume = curScreenDetails.audio.volume;
           volume = Math.min(volume + 1, 100);
           curScreenDetails.audio.volume = volume;
@@ -414,7 +417,8 @@ export const getActions = (instance) => {
       callback: () => {
         instance.selectedScreenList?.forEach((screenId) => {
           const curScreenDetails = instance.screenList.find((screen) => screen.screenId === Number(screenId))?.details;
-          if (!curScreenDetails) return;
+          // See screen_volume_add: audio may be absent.
+          if (!curScreenDetails?.audio) return;
           let volume = curScreenDetails.audio.volume;
           volume = Math.max(volume - 1, 0);
           curScreenDetails.audio.volume = volume;
@@ -591,8 +595,15 @@ export const getActions = (instance) => {
         const enable = parseInt(event.options.state);
         const osdType = event.options.osdType;
         instance.updateEnhancedFromAction(screenId, osdType === 'image' ? 'osdImage' : 'osdText', enable === 1);
+        // W040C (protocol 4.4.12/4.4.13) is a flat payload keyed by `type`:
+        // 0 = text OSD, 1 = image OSD. This previously sent `Osd: { enable }`,
+        // which buried the flag in an object the device does not read and left
+        // out `type` entirely, so it could never toggle the image OSD - while
+        // the variable above happily reported that it had.
         // safeSend guards on missing udp internally
-        instance.safeSend(handleParams(ACTIONS_CMD.osd_switch, { screenId, Osd: { enable } }));
+        instance.safeSend(
+          handleParams(ACTIONS_CMD.osd_switch, { screenId, enable, type: osdType === 'image' ? 1 : 0 }),
+        );
       },
     },
     test_pattern_direct: {
@@ -622,6 +633,10 @@ export const getActions = (instance) => {
           let brightness = curScreenDetails.brightness;
           brightness = Math.min(brightness + 1, 100);
           curScreenDetails.brightness = brightness;
+          // The brightness variable and gauge read enhancedState, not this list,
+          // so mirror the change across or the button moves the wall while the
+          // readout sits still until the next poll (and forever when offline).
+          instance.updateEnhancedFromAction(screenId, 'brightness', brightness);
           const command = handleParams(ACTIONS_CMD.apply_screen_brightness, {
             screenId,
             brightness: brightness,
@@ -641,6 +656,8 @@ export const getActions = (instance) => {
           let brightness = curScreenDetails.brightness;
           brightness = Math.max(brightness - 1, 0);
           curScreenDetails.brightness = brightness;
+          // See screen_brightness_add: enhancedState is what the readout reads.
+          instance.updateEnhancedFromAction(screenId, 'brightness', brightness);
           const command = handleParams(ACTIONS_CMD.apply_screen_brightness, {
             screenId,
             brightness: brightness,
