@@ -216,10 +216,20 @@ const buildAllPresets = (instance) => {
   instance.screenList?.forEach((screen) => {
     const { name, screenId } = screen;
 
+    // One 1% step per press. This is deliberately the plain version, because it
+    // is the half of the self-retrigger hold pattern that a preset is allowed to
+    // ship: Companion exposes only 11 internal actions to presets and
+    // `button_press` is not among them, so the repeat group (a runWhileHeld
+    // group pressing $(this:location)) has to be added on the button by hand.
+    const singleStep = (actionId) => ({
+      down: [{ actionId, options: { screenId } }],
+      up: [],
+    });
+
     // Hold to ramp: press starts a continuous ramp (one immediate step so a
     // quick tap still nudges 1%), release stops it. The module drives the repeat
-    // internally with a timer. This replaced an internal:logicWhile version --
-    // that has no working precedent in any shipping module and did not run.
+    // internally with a timer. Kept as its own preset rather than as the default
+    // so the plain step stays available for the retrigger pattern above.
     const holdRampStep = (actionId) => ({
       down: [{ actionId, options: { screenId, ms: BRIGHTNESS_RAMP_MS } }],
       up: [{ actionId: 'brightness_ramp_stop', options: { screenId } }],
@@ -229,7 +239,7 @@ const buildAllPresets = (instance) => {
       type: 'simple',
       name: `${name} Brightness +`,
       style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nBright +`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
-      steps: [holdRampStep('brightness_ramp_up')],
+      steps: [singleStep('brightness_add_direct')],
       feedbacks: [],
     };
 
@@ -237,6 +247,22 @@ const buildAllPresets = (instance) => {
       type: 'simple',
       name: `${name} Brightness -`,
       style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nBright -`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+      steps: [singleStep('brightness_minus_direct')],
+      feedbacks: [],
+    };
+
+    presets[`ramp_bright_up_${screenId}`] = {
+      type: 'simple',
+      name: `${name} Brightness + (Hold Ramp)`,
+      style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nBright +\nhold`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
+      steps: [holdRampStep('brightness_ramp_up')],
+      feedbacks: [],
+    };
+
+    presets[`ramp_bright_down_${screenId}`] = {
+      type: 'simple',
+      name: `${name} Brightness - (Hold Ramp)`,
+      style: { text: `$(${MODULE_NAME}:screenId_${screenId})\nBright -\nhold`, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 0, 0) },
       steps: [holdRampStep('brightness_ramp_down')],
       feedbacks: [],
     };
@@ -894,8 +920,10 @@ const buildStructure = (instance) => {
       presets: [
         `direct_bright_up_${screenId}`,
         `direct_bright_down_${screenId}`,
-        `bright_bar_${screenId}`,
+        `ramp_bright_up_${screenId}`,
+        `ramp_bright_down_${screenId}`,
         `bright_ring_simple_${screenId}`,
+        `bright_bar_${screenId}`,
         `bright_text_${screenId}`,
       ],
     });
