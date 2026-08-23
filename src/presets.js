@@ -333,7 +333,8 @@ const buildAllPresets = (instance) => {
           text: `$(${MODULE_NAME}:screenId_${screenId})`,
           fontsize: 55,
           fontsizeAllowShrink: true,
-          color: combineRgb(170, 170, 170),
+          // White, not grey: at button size a dimmed label is hard to read.
+          color: combineRgb(255, 255, 255),
           halign: 'center',
           valign: 'center',
         },

@@ -477,6 +477,31 @@ class ModuleInstance extends InstanceBase {
       }
     }
 
+    // Synthetic output connectors, one per screen, so the test pattern actions,
+    // feedbacks and presets can be built and driven offline. Without these the
+    // connector list is empty, per-screen targeting matches nothing and the
+    // cycle button sits on its base style with no colour feedback.
+    this.outputConnectors = {};
+    this.connectorTestPatterns = {};
+    this.slotCardTypes = {};
+    for (let i = 0; i < screenCount; i++) {
+      const outputId = i * 4; // mirrors the device's card*4 + connector spacing
+      const slotId = 20 + i * 2;
+      this.outputConnectors[outputId] = {
+        outputId,
+        interfaceId: 0,
+        slotId,
+        interfaceType: 2,
+        isCardOnline: 1,
+        isUsed: 1,
+        screenId: i,
+        screenName: `Screen ${i + 1}`,
+        deviceName: `output ${slotId + 1}-1`,
+      };
+      this.connectorTestPatterns[outputId] = 0xffff; // Off
+      this.slotCardTypes[slotId] = 3; // Sender, so "All Sending Cards" works offline
+    }
+
     this.sourceList = [];
     for (let slot = 0; slot < inputCardCount; slot++) {
       for (let conn = 0; conn < 4; conn++) {
