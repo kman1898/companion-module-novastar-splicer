@@ -176,54 +176,101 @@ const buildAllPresets = (instance) => {
       feedbacks: [],
     };
 
-    // Brightness bar readout as a LAYERED preset with a native `gauge` element
+    // Brightness readout as a LAYERED preset with a native `gauge` element
     // (API 2.1 / Companion 5.0). This replaces the old advanced feedback that
     // returned an imageBuffer, which Companion now marks deprecated. The gauge
     // reads the live brightness variable via an expression, so it needs no
     // feedback at all and stays resolution independent.
+    //
+    // Drawn as a RING rather than a bar: a ring wraps the edge and frees the
+    // whole centre for a large, readable value, and on surfaces with LED rings
+    // (Stream Deck+ dials) Companion drives the physical ring from the same
+    // colour model, so the hardware matches the screen.
     const brightnessVar = `$(${MODULE_NAME}:screen_${screenId + 1}_brightness)`;
     const brightBarLayered = {
       type: 'layered',
-      name: `${name} Brightness Bar`,
+      name: `${name} Brightness Ring`,
+      canvas: { decoration: 'none' },
       elements: [
         {
-          id: 'brightness_gauge',
-          name: 'Brightness',
-          type: 'gauge',
-          x: 4,
-          y: 74,
-          width: 92,
-          height: 18,
-          min: 0,
-          max: 100,
-          value: { isExpression: true, value: brightnessVar },
-          orientation: 'horizontal',
-          fillEnabled: true,
-          roundedEnds: true,
-          // Set trackAmount explicitly: Companion defaults it to 70 when a
-          // preset is imported but to 30 when an element is added in the UI,
-          // so relying on the default gives two different looks.
-          trackStyle: 'dimmed',
-          trackAmount: 30,
-          multiColour: false,
-          stops: [{ value: 0, color: combineRgb(0, 200, 0), gradient: false }],
+          // squareCoords keeps the ring circular on non-square keys instead of
+          // stretching it into an oval.
+          id: 'ring_group',
+          name: 'Ring',
+          type: 'group',
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+          squareCoords: true,
+          children: [
+            {
+              id: 'brightness_gauge',
+              name: 'Brightness',
+              type: 'gauge',
+              x: 6,
+              y: 6,
+              width: 88,
+              height: 88,
+              min: 0,
+              max: 100,
+              value: { isExpression: true, value: brightnessVar },
+              // Arc with a gap at the bottom, so the ring reads as a gauge and
+              // leaves room for the screen name underneath.
+              orientation: 'ring',
+              startAngle: 215,
+              endAngle: 145,
+              ringWidth: 15,
+              roundedEnds: true,
+              fillEnabled: true,
+              // Dim-to-bright ramp: the arc both grows and brightens as the
+              // level rises. multiColour shows every stop inside the filled
+              // portion, and gradient blends between them rather than stepping.
+              multiColour: true,
+              stops: [
+                { value: 0, color: combineRgb(0, 45, 20), gradient: true },
+                { value: 50, color: combineRgb(0, 150, 60), gradient: true },
+                { value: 100, color: combineRgb(90, 255, 140), gradient: false },
+              ],
+              // Set trackAmount explicitly: Companion defaults it to 70 when a
+              // preset is imported but to 30 when an element is added in the UI,
+              // so relying on the default gives two different looks.
+              trackStyle: 'dimmed',
+              trackAmount: 25,
+            },
+          ],
         },
         {
+          // Big value in the middle of the ring.
+          id: 'value',
+          name: 'Value',
+          type: 'text',
+          x: 0,
+          y: 26,
+          width: 100,
+          height: 38,
+          text: { isExpression: true, value: `concat(${brightnessVar}, "%")` },
+          fontsize: 100,
+          fontsizeAllowShrink: true,
+          color: combineRgb(255, 255, 255),
+          halign: 'center',
+          valign: 'center',
+        },
+        {
+          // Screen name tucked into the gap at the bottom of the arc.
           id: 'label',
           name: 'Label',
           type: 'text',
           x: 0,
-          y: 0,
+          y: 64,
           width: 100,
-          height: 70,
-          text: {
-            isExpression: true,
-            value: `concat($(${MODULE_NAME}:screenId_${screenId}), "\\n", ${brightnessVar}, "%")`,
-          },
-          color: combineRgb(255, 255, 255),
+          height: 24,
+          text: `$(${MODULE_NAME}:screenId_${screenId})`,
+          fontsize: 55,
+          fontsizeAllowShrink: true,
+          color: combineRgb(170, 170, 170),
           halign: 'center',
           valign: 'center',
-          fontsizeAllowShrink: true,
         },
       ],
       steps: [{ down: [], up: [] }],
@@ -240,7 +287,7 @@ const buildAllPresets = (instance) => {
         brightBarLayered,
         {
           type: 'simple',
-          name: `${name} Brightness Bar`,
+          name: `${name} Brightness Ring`,
           style: {
             text: `$(${MODULE_NAME}:screenId_${screenId})\n${brightnessVar}%`,
             size: 'auto',
