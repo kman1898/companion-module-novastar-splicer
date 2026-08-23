@@ -365,6 +365,75 @@ const buildAllPresets = (instance) => {
         },
       ],
     };
+
+    // ---- Lighter-weight readouts, for surfaces or Companion builds where the
+    // full ring stutters while brightness is being held. Each strips one layer
+    // of cost off the one above, so comparing them says where the cost is:
+    //   Ring          = grouped + squareCoords + gradient multiColour + alternatives
+    //   Ring (Simple) = flat, single colour, no group, no alternatives
+    //   Text          = no gauge at all, just the variable
+    // All three read the same brightness variable.
+    presets[`bright_ring_simple_${screenId}`] = {
+      type: 'layered',
+      name: `${name} Brightness Ring (Simple)`,
+      canvas: { decoration: 'none' },
+      elements: [
+        {
+          id: 'brightness_gauge',
+          name: 'Brightness',
+          type: 'gauge',
+          x: 6,
+          y: 6,
+          width: 88,
+          height: 88,
+          min: 0,
+          max: 100,
+          value: { isExpression: true, value: brightnessVar },
+          orientation: 'ring',
+          startAngle: 215,
+          endAngle: 145,
+          ringWidth: 15,
+          roundedEnds: true,
+          fillEnabled: true,
+          // Single flat colour: no multiColour, no gradient stops. If this one
+          // is smooth and the full ring is not, the gradient is the cost.
+          multiColour: false,
+          stops: [{ value: 0, color: combineRgb(0, 200, 80), gradient: false }],
+          trackStyle: 'dimmed',
+          trackAmount: 30,
+        },
+        {
+          id: 'value',
+          name: 'Value',
+          type: 'text',
+          x: 0,
+          y: 26,
+          width: 100,
+          height: 38,
+          text: { isExpression: true, value: `concat(${brightnessVar}, "%")` },
+          fontsize: 100,
+          fontsizeAllowShrink: true,
+          color: combineRgb(255, 255, 255),
+          halign: 'center',
+          valign: 'center',
+        },
+      ],
+      steps: [{ down: [], up: [] }],
+      feedbacks: [],
+    };
+
+    presets[`bright_text_${screenId}`] = {
+      type: 'simple',
+      name: `${name} Brightness Text`,
+      style: {
+        text: `$(${MODULE_NAME}:screenId_${screenId})\n${brightnessVar}%`,
+        size: 'auto',
+        color: combineRgb(255, 255, 255),
+        bgcolor: combineRgb(0, 0, 0),
+      },
+      steps: [{ down: [], up: [] }],
+      feedbacks: [],
+    };
   });
 
   // ---- Preset Collection (Group) presets ----
@@ -826,6 +895,8 @@ const buildStructure = (instance) => {
         `direct_bright_up_${screenId}`,
         `direct_bright_down_${screenId}`,
         `bright_bar_${screenId}`,
+        `bright_ring_simple_${screenId}`,
+        `bright_text_${screenId}`,
       ],
     });
 

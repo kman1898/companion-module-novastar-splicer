@@ -26,6 +26,14 @@ import {
   getScreenList,
 } from '../utils/request.js';
 import { getActions } from './actions.js';
+
+/**
+ * How long a locally-set brightness stays authoritative over the polled value.
+ * Long enough for the device to apply a command and report it back at the
+ * default 1s poll, short enough that a change made on the front panel still
+ * shows up promptly.
+ */
+const BRIGHTNESS_SETTLE_MS = 2500;
 import { getFeedbacks } from './feedbacks.js';
 import { getPresetDefinitions } from './presets.js';
 
@@ -85,6 +93,7 @@ class ModuleInstance extends InstanceBase {
     this.selectedScreenList = [];
     /** Per-screen brightness hold-to-ramp interval handles (keyed by screenId) */
     this.brightnessRampTimers = {};
+    this.brightnessPending = {};
     /** 选中的图层 */
     this.selectedLayerInfo = null;
     /** 定时器句柄 */
@@ -160,7 +169,12 @@ class ModuleInstance extends InstanceBase {
     const id = Number(screenId);
     const details = this.screenList?.find((s) => s.screenId === id)?.details;
     if (!details) return undefined;
-    const brightness = Math.max(0, Math.min(100, (details.brightness ?? 100) + delta));
+    // Step from our own in-flight value. `details` is rewritten by the R0401
+    // poll with whatever the device has applied so far, so basing the next step
+    // on it makes a held ramp fight the poll and visibly stutter.
+    const inFlight = this.brightnessPending?.[id];
+    const base = inFlight ? inFlight.target : (details.brightness ?? 100);
+    const brightness = Math.max(0, Math.min(100, base + delta));
     details.brightness = brightness;
     this.updateEnhancedFromAction(id, 'brightness', brightness);
     this.safeSend(handleParams(ACTIONS_CMD.apply_screen_brightness, { screenId: id, brightness }));
@@ -217,6 +231,7 @@ class ModuleInstance extends InstanceBase {
       clearInterval(this.brightnessRampTimers[key]);
     }
     this.brightnessRampTimers = {};
+    this.brightnessPending = {};
   }
 
   /** Initialize per-screen enhanced state with defaults */
@@ -252,7 +267,9 @@ class ModuleInstance extends InstanceBase {
     if (!this.enhancedState.screens[screenId]) this.initEnhancedScreen(screenId);
     const s = this.enhancedState.screens[screenId];
     const before = { ...s };
-    if (details.brightness !== undefined) s.brightness = details.brightness;
+    if (details.brightness !== undefined && this.acceptPolledBrightness(screenId, details.brightness)) {
+      s.brightness = details.brightness;
+    }
     if (details.Freeze?.enable !== undefined) s.frozen = details.Freeze.enable === 1;
     // FTB uses the INVERTED convention (known Novastar quirk): per protocol
     // W0409 "Set Screen FTB", type 0 = FTB enabled, 1 = FTB disabled — the
@@ -281,8 +298,42 @@ class ModuleInstance extends InstanceBase {
   }
 
   /** Optimistic update from action callback — instant variable + feedback refresh */
+  /**
+   * Record a brightness we have sent but the device has not confirmed yet.
+   * The window is pushed out on every write, so a continuously held ramp stays
+   * authoritative for as long as it runs and only hands back once it settles.
+   */
+  noteBrightnessWrite(screenId, brightness) {
+    this.brightnessPending = this.brightnessPending ?? {};
+    this.brightnessPending[Number(screenId)] = {
+      target: brightness,
+      expires: Date.now() + BRIGHTNESS_SETTLE_MS,
+    };
+  }
+
+  /**
+   * Whether a polled brightness should be believed. While one of our own writes
+   * is in flight the device lags behind the commands we have already sent, and
+   * accepting its value would snap the level backwards on the button.
+   */
+  acceptPolledBrightness(screenId, deviceValue) {
+    const id = Number(screenId);
+    const pending = this.brightnessPending?.[id];
+    if (!pending) return true;
+    // Device caught up, or we waited long enough (someone may have changed it
+    // on the front panel): hand authority back to the poll.
+    if (deviceValue === pending.target || Date.now() >= pending.expires) {
+      delete this.brightnessPending[id];
+      return true;
+    }
+    return false;
+  }
+
   updateEnhancedFromAction(screenId, property, value) {
     if (!this.enhancedState.screens[screenId]) this.initEnhancedScreen(screenId);
+    // Every local brightness write is optimistic: we set it before the device
+    // confirms. Register it so the poll cannot stomp it in the meantime.
+    if (property === 'brightness') this.noteBrightnessWrite(screenId, value);
     this.enhancedState.screens[screenId][property] = value;
     const prefix = `screen_${screenId + 1}`;
     const varMap = {
