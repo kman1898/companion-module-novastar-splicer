@@ -45,6 +45,15 @@ const TEST_PATTERN_COLORS = {
   0xffff: [0, 0, 0], // Off
 };
 
+/** Lighten a colour towards white, for the "this pattern is live" state. */
+const testPatternActiveStyle = (patternId) => {
+  const [r, g, b] = TEST_PATTERN_COLORS[patternId] ?? [40, 40, 40];
+  const lift = (c) => Math.round(c + (255 - c) * 0.55);
+  const [lr, lg, lb] = [lift(r), lift(g), lift(b)];
+  const luma = 0.299 * lr + 0.587 * lg + 0.114 * lb;
+  return { bgcolor: combineRgb(lr, lg, lb), color: luma > 140 ? combineRgb(0, 0, 0) : combineRgb(255, 255, 255) };
+};
+
 /** Button face for a pattern, with text colour chosen for contrast. */
 const testPatternStyle = (patternId) => {
   const [r, g, b] = TEST_PATTERN_COLORS[patternId] ?? [40, 40, 40];
@@ -695,7 +704,13 @@ const buildAllPresets = (instance) => {
           { down: [{ actionId: 'test_pattern_screen', options: { target: screenId, testPattern: TEST_PATTERN_OFF, grid: 3, speed: 2, bright: 2 } }], up: [] },
         ],
         feedbacks: [
-          { feedbackId: 'test_pattern_direct', options: { screenId }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
+          // Lights with a brighter shade of its own colour when this pattern is
+          // the one running, so the button keeps its identity while showing state.
+          {
+            feedbackId: 'test_pattern_is',
+            options: { screenId, testPattern: tp.id },
+            style: testPatternActiveStyle(tp.id),
+          },
         ],
       };
     });
@@ -730,9 +745,13 @@ const buildAllPresets = (instance) => {
           up: [],
         },
       ],
-      feedbacks: [
-        { feedbackId: 'test_pattern_direct', options: { screenId }, style: { bgcolor: combineRgb(0, 255, 0), color: combineRgb(0, 0, 0) } },
-      ],
+      // One feedback per pattern: whichever is live wins, so the cycle button
+      // wears the colour of the pattern currently on the wall as you step.
+      feedbacks: PANEL_TEST_PATTERNS.map((tp) => ({
+        feedbackId: 'test_pattern_is',
+        options: { screenId, testPattern: tp.id },
+        style: testPatternStyle(tp.id),
+      })),
     };
 
   });

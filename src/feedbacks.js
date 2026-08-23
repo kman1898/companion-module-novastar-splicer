@@ -1,5 +1,5 @@
 import { combineRgb } from '@companion-module/base';
-import { PGM_PVW_TYPE } from '../utils/constant.js';
+import { PGM_PVW_TYPE, TEST_PATTERNS } from '../utils/constant.js';
 import formatDropDownData from '../utils/formatDropDown.js';
 
 export const getFeedbacks = (instance) => {
@@ -215,6 +215,35 @@ export const getFeedbacks = (instance) => {
       callback: (feedback) => {
         const v = instance.connectorTestPatterns?.[Number(feedback.options.outputId)];
         return v !== undefined && v !== 0xffff;
+      },
+    },
+    // True when a specific pattern is live on a screen. Lets a button show
+    // which pattern is running rather than just that one is: the cycle button
+    // takes on the colour of the current pattern, and each per-pattern button
+    // lights when it is the active one.
+    test_pattern_is: {
+      type: 'boolean',
+      name: 'Test Pattern Is (Screen)',
+      description: 'True when the chosen pattern is currently set on the screen\'s output connectors.',
+      defaultStyle: { bgcolor: combineRgb(255, 255, 255), color: combineRgb(0, 0, 0) },
+      options: [
+        {
+          type: 'dropdown',
+          label: 'Screen',
+          id: 'screenId',
+          default: screenListDropDown[0]?.id ?? null,
+          choices: screenListDropDown,
+        },
+        { type: 'dropdown', label: 'Pattern', id: 'testPattern', default: 0x0004, choices: TEST_PATTERNS },
+      ],
+      callback: (feedback) => {
+        const screenId = Number(feedback.options.screenId);
+        const want = Number(feedback.options.testPattern);
+        const connectors = Object.values(instance.outputConnectors ?? {}).filter((c) => c.screenId === screenId);
+        if (!connectors.length) return false;
+        // Any connector on the screen showing it counts: they are driven
+        // together, and a partial state should still be visible.
+        return connectors.some((c) => instance.connectorTestPatterns?.[c.outputId] === want);
       },
     },
     // ==================== Direct per-screen feedbacks ====================
