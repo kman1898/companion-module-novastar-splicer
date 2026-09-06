@@ -34,6 +34,16 @@ import { getActions } from './actions.js';
  * shows up promptly.
  */
 const BRIGHTNESS_SETTLE_MS = 2500;
+
+/**
+ * Silent poll cycles before the UDP socket is torn down and rebuilt, and how
+ * often to retry after that. At the default 1s poll that is a first attempt
+ * after 30s, then every 60s. Deliberately well clear of the 1-3s gaps this
+ * link shows in normal operation: this is a last resort for a receive path
+ * that has genuinely died, not a response to ordinary jitter.
+ */
+const UDP_REBUILD_AFTER_TICKS = 30;
+const UDP_REBUILD_EVERY_TICKS = 60;
 import { getFeedbacks } from './feedbacks.js';
 import { getPresetDefinitions } from './presets.js';
 
@@ -414,6 +424,7 @@ class ModuleInstance extends InstanceBase {
     }
     try {
       this.udp.send(data);
+      this.txCount = (this.txCount ?? 0) + 1;
     } catch (err) {
       this.log('warn', `UDP send error: ${err.message}`);
       this.updateStatus(InstanceStatus.ConnectionFailure);
@@ -437,16 +448,48 @@ class ModuleInstance extends InstanceBase {
         this.noReplyTicks = (this.noReplyTicks ?? 0) + 1;
         // Warn once at ~5 ticks, then every ~30 ticks, so the log is not spammed.
         if (this.noReplyTicks === 5 || this.noReplyTicks % 30 === 0) {
+          // tx/rx counts make the two failure modes distinguishable from the
+          // default log level: a climbing tx with a frozen rx is "device or
+          // socket stopped answering", while a frozen tx means our own poll
+          // timer died and the device is not at fault.
           this.log(
             'warn',
-            `No response from device at ${this.config.host}:${this.config.port} for ${this.noReplyTicks} poll cycles. ` +
+            `No response from device at ${this.config.host}:${this.config.port} for ${this.noReplyTicks} poll cycles ` +
+              `(sent ${this.txCount ?? 0}, received ${this.rxCount ?? 0}). ` +
               `Check the IP/port, that the splicer is reachable, and that inbound UDP is not blocked by a firewall.`,
           );
           this.updateStatus(InstanceStatus.ConnectionFailure, 'No response from device');
         }
+        // Nothing rebuilt the socket before this: initUDP() ran only at startup
+        // and on a config change, so once the receive path died the module
+        // polled into the void until someone restarted the connection by hand.
+        // Transmits can keep succeeding on a socket whose replies no longer
+        // arrive, which is why buttons still appear to work while every
+        // variable goes stale. Rebuild periodically, not every tick, so a
+        // genuinely absent device does not get hammered.
+        if (this.noReplyTicks >= UDP_REBUILD_AFTER_TICKS && this.noReplyTicks % UDP_REBUILD_EVERY_TICKS === 0) {
+          this.log('warn', `Rebuilding UDP socket after ${this.noReplyTicks} silent poll cycles`);
+          try {
+            this.connectStatus = false;
+            this.heartbeatManager.stop();
+            this.initUDP();
+          } catch (err) {
+            this.log('error', `UDP rebuild failed: ${err?.message ?? err}`);
+          }
+        }
       } else if (this.noReplyTicks) {
-        this.log('info', 'Device responding again');
+        this.log('info', `Device responding again after ${this.noReplyTicks} silent poll cycles`);
         this.noReplyTicks = 0;
+        // Clear the failure status as well as the counter. Without this the
+        // status latched: one silent stretch long enough to trip the warning
+        // set ConnectionFailure permanently, and nothing ever set it back, so
+        // Companion showed "No response from device" indefinitely while data
+        // flowed normally and every button kept working. Brief gaps are routine
+        // on this link, so this fired sooner or later on any long session.
+        this.updateStatus(
+          this.connectStatus ? InstanceStatus.Ok : InstanceStatus.Connecting,
+          this.connectStatus ? undefined : 'Reconnecting',
+        );
       }
       this.lastSeenRxCount = rx;
       // Flush whatever the last cycle's responses changed, once, at ping rate.
