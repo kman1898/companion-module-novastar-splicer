@@ -71,7 +71,7 @@ const DEFAULT_CONFIG = {
 function applyConfigDefaults(config) {
   const merged = { ...config };
   let filledMissing = false;
-  // Numeric fields where 0 is never a legal value — a stored 0 means the field
+  // Numeric fields where 0 is never a legal value: a stored 0 means the field
   // was never populated (Companion does not backfill defaults onto an existing
   // connection), so treat it as missing. Without this, Poll Interval shows 0 in
   // the config UI even though the runtime falls back to 1000.
@@ -270,7 +270,7 @@ class ModuleInstance extends InstanceBase {
    *     OsdImage: { enable: 0|1 } }
    * An earlier version read flat names (bkgEnable, screenFrz, blackout,
    * textOsdEnable) that don't exist in the payload, so freeze/ftb/bkg/osd
-   * never reconciled from device truth — they only reflected optimistic
+   * never reconciled from device truth; they only reflected optimistic
    * action presses. This reads the real nested fields.
    */
   updateEnhancedFromDetails(screenId, details) {
@@ -282,7 +282,7 @@ class ModuleInstance extends InstanceBase {
     }
     if (details.Freeze?.enable !== undefined) s.frozen = details.Freeze.enable === 1;
     // FTB uses the INVERTED convention (known Novastar quirk): per protocol
-    // W0409 "Set Screen FTB", type 0 = FTB enabled, 1 = FTB disabled — the
+    // W0409 "Set Screen FTB", type 0 = FTB enabled, 1 = FTB disabled, the
     // opposite of Freeze. So Ftb.enable === 0 means FTB is on.
     if (details.Ftb?.enable !== undefined) s.ftb = details.Ftb.enable === 0;
     if (details.Bkg?.enable !== undefined) {
@@ -307,7 +307,7 @@ class ModuleInstance extends InstanceBase {
     if (changed.length > 0) this.checkFeedbacks(...changed);
   }
 
-  /** Optimistic update from action callback — instant variable + feedback refresh */
+  /** Optimistic update from action callback: instant variable + feedback refresh */
   /**
    * Record a brightness we have sent but the device has not confirmed yet.
    * The window is pushed out on every write, so a continuously held ramp stays
@@ -700,7 +700,7 @@ class ModuleInstance extends InstanceBase {
     const { sourceVariableDefinitions, sourceDefaultVariableValues } = formatSourceVariable(this.sourceList);
     const { definitions: enhancedDefs, values: enhancedVals } = this.getEnhancedVariables();
 
-    // Input signal variables — only emitted when polling is enabled, so the
+    // Input signal variables, only emitted when polling is enabled, so the
     // feature is dead code (no defs, no values) when the toggle is off.
     const inputSignalDefs = [];
     const inputSignalVals = {};
@@ -779,7 +779,7 @@ class ModuleInstance extends InstanceBase {
     // (Get Device Details) returns slotList[] with the complete inventory of
     // every installed card: slotId, cardType (1=Input, 2=Output, 3=Sender,
     // 4=MVR), and interfaces[] including iSignal for each connector.
-    // One call enumerates every input slot and connector on the device — no
+    // One call enumerates every input slot and connector on the device, no
     // need to scan slot numbers or guess at card layout. The response handler
     // filters to cardType=1 slots so only real input connectors are surfaced.
     const cmd = JSON.stringify([{ cmd: ACTIONS_CMD.get_device_details, param0: this.deviceId }]);
@@ -832,7 +832,7 @@ class ModuleInstance extends InstanceBase {
         width: 12,
         label: 'Offline Programming',
         value:
-          'Enable Offline Programming Mode to build and test buttons against a synthetic device — useful when hardware arrives after the show is being programmed. Actions will be silently no-op for the UDP layer; variables and feedbacks populate from the counts below.',
+          'Enable Offline Programming Mode to build and test buttons against a synthetic device. Useful when hardware arrives after the show is being programmed. Actions will be silently no-op for the UDP layer; variables and feedbacks populate from the counts below.',
       },
       {
         type: 'checkbox',
@@ -1024,7 +1024,7 @@ class ModuleInstance extends InstanceBase {
     // Handle offline mode toggle
     if (offlineModeChanged) {
       if (this.config.offlineMode) {
-        // Entering offline mode — tear down any live connection cleanly
+        // Entering offline mode: tear down any live connection cleanly
         if (this.udp) {
           this.udp.destroy();
           delete this.udp;
@@ -1041,7 +1041,7 @@ class ModuleInstance extends InstanceBase {
         this.updateStatus(InstanceStatus.Ok, 'Offline Programming Mode');
         return;
       } else {
-        // Leaving offline mode — clear synthetic data and immediately fetch
+        // Leaving offline mode: clear synthetic data and immediately fetch
         // real device state so Presets/Feedback refresh without needing a
         // host change or polling cycle.
         this.screenList = [];
@@ -1232,13 +1232,13 @@ class ModuleInstance extends InstanceBase {
 
         // Skip connectors that are not a usable input.
         //
-        // 1) functionType=255 means "Invalid" (protocol §4.3.5) — the
+        // 1) functionType=255 means "Invalid" (protocol §4.3.5): the
         //    disabled side of a combo HDMI/DP input card where only one
         //    connector can be enabled at a time. Never a usable input.
         if (iface.functionType === 255) continue;
 
         // 2) 12G-SDI loop-out. The H_1x12G SDI input card exposes two
-        //    interfaceType=18 connectors, but only connector 0 is an input —
+        //    interfaceType=18 connectors, but only connector 0 is an input;
         //    connector 1 is a hardware LOOP-OUT. The protocol returns both
         //    with identical fields (no direction flag), so we encode the
         //    card's known layout: on a 12G-SDI card, keep connector 0 only.

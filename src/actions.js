@@ -1115,7 +1115,7 @@ export const getActions = (instance) => {
         instance.safeSend(command);
       },
     },
-    // Global blackout (W0700). Distinct from per-screen FTB / black_screen —
+    // Global blackout (W0700). Distinct from per-screen FTB / black_screen:
     // this affects every screen on the device at once.
     blackout: {
       name: 'Blackout (Global)',

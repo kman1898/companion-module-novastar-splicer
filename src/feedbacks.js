@@ -368,7 +368,7 @@ export const getFeedbacks = (instance) => {
                 type: 'dropdown',
                 label: 'Input',
                 id: 'inputKey',
-                // Choices derived from inputSignalState — only real
+                // Choices derived from inputSignalState. Only real
                 // slot/connector pairs that have actually returned R0102
                 // data appear in the dropdown. Updated on every poll tick,
                 // so the menu populates within ~1 second of enabling

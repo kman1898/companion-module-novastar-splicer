@@ -875,7 +875,7 @@ const buildStructure = (instance) => {
     // a show: brightness first (most used), then scene recall, then the
     // per-screen controls, with selection/layers/test pattern further down.
 
-    // 1. Brightness levels (one simple preset per level — each shows its own %)
+    // 1. Brightness levels (one simple preset per level, each shows its own %)
     groups.push({
       id: `screen_${screenId}_brightness_levels`,
       type: 'simple',
@@ -899,7 +899,7 @@ const buildStructure = (instance) => {
       ],
     });
 
-    // 3. Preset Recall (one simple preset per scene — real names baked in)
+    // 3. Preset Recall (one simple preset per scene, real names baked in)
     const screenPresets = screen.presets || [];
     if (screenPresets.length > 0) {
       groups.push({
@@ -937,7 +937,7 @@ const buildStructure = (instance) => {
       presets: [`screen_${screenId}`],
     });
 
-    // 6. Layers (one simple preset per layer — real names baked in)
+    // 6. Layers (one simple preset per layer, real names baked in)
     const screenLayers = screen.layers || [];
     if (screenLayers.length > 0) {
       groups.push({
